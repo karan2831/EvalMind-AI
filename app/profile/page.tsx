@@ -56,52 +56,52 @@ export default function ProfilePage() {
 
         {/* Profile Sections */}
         <section className="space-y-6">
-          <div className="apple-card overflow-hidden">
-            <div className="p-4 border-b border-[#e5e5ea] flex items-center justify-between cursor-pointer hover:bg-[#f5f5f7] transition-colors">
+          <div className="bg-white border border-gray-100 shadow-sm rounded-2xl overflow-hidden">
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-[#007aff] bg-opacity-10 text-[#007aff] flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
                   <span className="material-symbols-outlined text-[18px]">person</span>
                 </div>
                 <span className="font-semibold text-sm">Personal Info</span>
               </div>
-              <span className="material-symbols-outlined text-[#86868b] text-sm">arrow_forward_ios</span>
+              <span className="material-symbols-outlined text-gray-400 text-sm">arrow_forward_ios</span>
             </div>
             
-            <div className="p-4 border-b border-[#e5e5ea] flex items-center justify-between cursor-pointer hover:bg-[#f5f5f7] transition-colors">
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-[#34c759] bg-opacity-10 text-[#34c759] flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full bg-green-50 text-green-600 flex items-center justify-center">
                   <span className="material-symbols-outlined text-[18px]">security</span>
                 </div>
                 <span className="font-semibold text-sm">Security & Password</span>
               </div>
-              <span className="material-symbols-outlined text-[#86868b] text-sm">arrow_forward_ios</span>
+              <span className="material-symbols-outlined text-gray-400 text-sm">arrow_forward_ios</span>
             </div>
             
-            <div className="p-4 border-b border-[#e5e5ea] flex items-center justify-between cursor-pointer hover:bg-[#f5f5f7] transition-colors">
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-[#ff9500] bg-opacity-10 text-[#ff9500] flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center">
                   <span className="material-symbols-outlined text-[18px]">settings</span>
                 </div>
                 <span className="font-semibold text-sm">Preferences</span>
               </div>
-              <span className="material-symbols-outlined text-[#86868b] text-sm">arrow_forward_ios</span>
+              <span className="material-symbols-outlined text-gray-400 text-sm">arrow_forward_ios</span>
             </div>
 
-            <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-[#f5f5f7] transition-colors">
+            <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-[#5856d6] bg-opacity-10 text-[#5856d6] flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
                   <span className="material-symbols-outlined text-[18px]">help</span>
                 </div>
                 <span className="font-semibold text-sm">Support</span>
               </div>
-              <span className="material-symbols-outlined text-[#86868b] text-sm">arrow_forward_ios</span>
+              <span className="material-symbols-outlined text-gray-400 text-sm">arrow_forward_ios</span>
             </div>
           </div>
 
           <div className="pt-6">
             <button 
               onClick={handleSignOut}
-              className="w-full bg-white border border-[#ff3b30] text-[#ff3b30] hover:bg-[#ff3b30] hover:bg-opacity-10 py-3.5 rounded-xl font-semibold text-base transition-colors"
+              className="w-full bg-white border border-gray-200 text-gray-900 hover:bg-red-50 hover:border-red-400 py-3.5 rounded-xl font-semibold text-base transition-all duration-200 cursor-pointer active:scale-[0.98]"
             >
               Sign Out
             </button>

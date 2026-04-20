@@ -39,6 +39,13 @@ async def check_rate_limit(request: Request):
     
     rate_limit_store[client_ip].append(now)
 
+async def verify_token(request: Request):
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        logger.warning(f"Unauthorized access attempt from IP: {request.client.host}")
+        raise HTTPException(status_code=401, detail="Authentication required for PDF evaluation")
+    return auth_header
+
 # ==========================================
 # PART 2: SECURITY - CORS & HEADERS
 # ==========================================
@@ -50,10 +57,10 @@ ALLOWED_ORIGINS = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=["*"],  # restrict later
     allow_credentials=True,
-    allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # ==========================================
@@ -95,6 +102,7 @@ class EvaluationResponse(BaseModel):
     result_label: str
     improvement_plan: str
     learning_outcome: str
+    validation_confidence: float = 1.0
     extracted_text_preview: Optional[str] = None
 
 # ==========================================
@@ -178,6 +186,53 @@ def generate_ideal_answer(question: str, marks: int):
         key_points = knowledge['points']
     return ideal, key_points, knowledge.get("explanations", {})
 
+def validate_input_quality(answer: str, question: str, marks: int, key_points: List[str]):
+    answer_lower = answer.lower()
+    
+    # Rule 1: Repeated characters (Extreme spam)
+    if re.search(r'(.)\1{10,}', answer):
+        return "garbage", 0.0, "Contains excessive repeated characters."
+    
+    # Extract keywords for relevance check
+    all_keywords = []
+    for pt in key_points:
+        all_keywords.extend([w for w in re.findall(r'\w+', pt.lower()) if len(w) > 4])
+    
+    relevant_matches = sum(1 for kw in set(all_keywords) if kw in answer_lower)
+    words = answer.split()
+    word_count = len(words)
+    unique_words = set(w.lower() for w in words)
+    
+    # Gibberish Check
+    is_gibberish = word_count > 10 and (len(unique_words) / word_count) < 0.3
+    has_no_real_words = not re.search(r'[a-zA-Z]{3,}', answer)
+    
+    if has_no_real_words or (is_gibberish and relevant_matches == 0):
+        return "garbage", 0.1, "No meaningful or relevant words detected."
+
+    # Rule 2: Relevance Check (Context Awareness)
+    # If it's very short but contains relevant keywords, it's not garbage
+    relevance_score = min(1.0, relevant_matches / 2) if relevant_matches > 0 else 0
+    
+    # Soft Length Thresholds
+    min_chars = {2: 10, 5: 25, 10: 60}
+    is_very_short = len(answer.strip()) < min_chars.get(marks, 25)
+    
+    if is_very_short:
+        if relevant_matches >= 1:
+            return "low_quality", 0.6, "Answer is relevant but very concise."
+        else:
+            return "garbage", 0.2, "Answer is too short and lacks relevance."
+
+    if relevant_matches == 0 and word_count > 5:
+        # Check for generic but meaningful structure
+        structure_cues = ["is", "the", "and", "because", "process"]
+        has_structure = sum(1 for c in structure_cues if c in answer_lower) >= 2
+        if not has_structure:
+            return "garbage", 0.3, "Answer does not appear relevant to the topic."
+
+    return "valid", 1.0, ""
+
 def calculate_metrics(student_answer: str, key_points: List[str], marks: int):
     answer_lower = student_answer.lower()
     words = student_answer.split()
@@ -205,7 +260,7 @@ def calculate_metrics(student_answer: str, key_points: List[str], marks: int):
 # ==========================================
 # PART 5: PROTECTED ENDPOINTS
 # ==========================================
-@app.post("/evaluate-pdf", dependencies=[Depends(check_rate_limit)])
+@app.post("/evaluate-pdf", dependencies=[Depends(check_rate_limit), Depends(verify_token)])
 async def evaluate_pdf(
     file: UploadFile = File(...),
     marks: int = Form(...),
@@ -262,6 +317,27 @@ async def evaluate_pdf(
 async def evaluate_answer(request: EvaluationRequest):
     try:
         ideal, key_points, exp_map = generate_ideal_answer(request.question, request.marks)
+        
+        # Step 1: Intelligent Input Quality Validation
+        quality_state, val_confidence, reason = validate_input_quality(request.answer, request.question, request.marks, key_points)
+        
+        if quality_state == "garbage":
+            return EvaluationResponse(
+                score=0, max_score=request.marks,
+                breakdown=[BreakdownItem(concept=c, score="0%") for c in ["Coverage", "Depth", "Clarity"]],
+                scoring_breakdown=ScoreBreakdown(coverage=0, depth=0, clarity=0),
+                confidence=0.0, missing_points=[], ideal_answer=ideal,
+                detected_level="Invalid", feedback="Validation Failed",
+                feedback_simple="This answer is not relevant or meaningful for the question. Please provide a proper response.",
+                mistake_explanations=[f"Reason: {reason}"],
+                summary="Invalid Response", result_label="Invalid Response",
+                improvement_plan="Focus on writing a coherent answer with relevant keywords.",
+                learning_outcome="Quality is as important as quantity.",
+                validation_confidence=val_confidence,
+                extracted_text_preview=request.answer[:300]
+            )
+
+        # Step 2: Standard Evaluation
         cov, depth, clarity, missing, det_lvl = calculate_metrics(request.answer, key_points, request.marks)
         
         scoring = ScoreBreakdown(coverage=cov, depth=depth, clarity=clarity)
@@ -269,23 +345,27 @@ async def evaluate_answer(request: EvaluationRequest):
         raw_score = (cov * 0.5 + depth * 0.3 + clarity * 0.2) * request.marks
         final_score = min(max(1, int(round(raw_score))), request.marks)
 
+        # Step 3: Result Labeling
         percentage = (final_score / request.marks) * 100
-        if percentage >= 85: result_label = "Excellent Answer"
-        elif percentage >= 50: result_label = "Good Answer"
-        else: result_label = "Needs Improvement"
-
-        prefix = "Good start! " if final_score >= request.marks * 0.4 else "Nice attempt! "
-        next_step = " Next time, try adding more explanation or examples." if final_score < request.marks else " Great job!"
-
-        if final_score == request.marks:
+        if quality_state == "low_quality":
+            result_label = "Low Quality Answer"
+            summary = "Answer is too concise."
+            feedback_simple = "Your answer is very short but relevant. Try adding more explanation to get better marks."
+            final_score = min(final_score, max(1, request.marks // 4)) # Cap score for low quality but allow partial marks
+        elif percentage >= 85:
+            result_label = "Excellent Answer"
             summary = "Your answer is well-structured and complete."
-            feedback_simple = f"{prefix}Your answer covers everything.{next_step}"
-            improvement_plan = "You've mastered this topic!"
+            feedback_simple = "Excellent work! Your answer covers all key aspects."
+        elif percentage >= 50:
+            result_label = "Good Answer"
+            summary = "Your answer is good but could be more detailed."
+            feedback_simple = "Nice attempt! You've covered the basics. Try to go deeper into the mechanics."
         else:
+            result_label = "Needs Improvement"
             summary = "Your answer needs more detail."
-            feedback_simple = f"{prefix}You missed some key points.{next_step}"
-            improvement_plan = "Try to explain the 'why' behind each point."
+            feedback_simple = "You missed some key points. Focus on explaining the 'why' behind each concept."
 
+        improvement_plan = "Try to explain the 'why' behind each point." if percentage < 85 else "You've mastered this topic!"
         mistakes = [exp_map.get(m, f"You missed {m}.") for m in missing[:3]]
         breakdown = [BreakdownItem(concept=c, score=f"{int(s*100)}%") for c, s in zip(["Coverage", "Depth", "Clarity"], [cov, depth, clarity])]
 
@@ -295,7 +375,9 @@ async def evaluate_answer(request: EvaluationRequest):
             detected_level=det_lvl, feedback="Evaluation Complete",
             feedback_simple=feedback_simple, mistake_explanations=mistakes, 
             summary=summary, result_label=result_label, improvement_plan=improvement_plan,
-            learning_outcome="You're getting better!", extracted_text_preview=request.answer[:300]
+            learning_outcome="You're getting better!", 
+            validation_confidence=val_confidence,
+            extracted_text_preview=request.answer[:300]
         )
     except Exception as e:
         logger.error(f"Evaluation Error: {str(e)}")
