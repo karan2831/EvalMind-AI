@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-primary-container": "#fcfbff",
+                    "primary-fixed": "#d7e2ff",
+                    "on-secondary": "#ffffff",
+                    "primary": "#0059b5",
+                    "error-container": "#ffdad6",
+                    "secondary": "#5e5e63",
+                    "surface": "#f9f9fb",
+                    "on-secondary-fixed": "#1a1b1f",
+                    "surface-tint": "#005cbb",
+                    "surface-bright": "#f9f9fb",
+                    "error": "#ba1a1a",
+                    "surface-container": "#eeeef0",
+                    "outline": "#717785",
+                    "surface-variant": "#e2e2e4",
+                    "secondary-fixed-dim": "#c7c6cb",
+                    "tertiary-container": "#747375",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary-fixed-variant": "#46464b",
+                    "inverse-on-surface": "#f0f0f2",
+                    "on-tertiary-fixed-variant": "#474649",
+                    "on-error": "#ffffff",
+                    "outline-variant": "#c1c6d6",
+                    "surface-dim": "#d9dadc",
+                    "on-surface-variant": "#414753",
+                    "on-tertiary-container": "#fdfafc",
+                    "inverse-primary": "#abc7ff",
+                    "tertiary": "#5b5b5d",
+                    "on-surface": "#1a1c1d",
+                    "on-primary": "#ffffff",
+                    "tertiary-fixed-dim": "#c8c6c8",
+                    "tertiary-fixed": "#e4e2e4",
+                    "on-primary-fixed-variant": "#00458f",
+                    "on-secondary-container": "#626267",
+                    "on-tertiary-fixed": "#1b1b1d",
+                    "surface-container-low": "#f3f3f5",
+                    "surface-container-highest": "#e2e2e4",
+                    "secondary-container": "#e0dfe4",
+                    "inverse-surface": "#2f3132",
+                    "primary-fixed-dim": "#abc7ff",
+                    "on-error-container": "#93000a",
+                    "surface-container-lowest": "#ffffff",
+                    "on-primary-fixed": "#001b3f",
+                    "surface-container-high": "#e8e8ea",
+                    "secondary-fixed": "#e3e2e7",
+                    "on-background": "#1a1c1d",
+                    "primary-container": "#0071e3",
+                    "background": "#f9f9fb"
+            },
+            "borderRadius": {
+                    "DEFAULT": "1rem",
+                    "lg": "2rem",
+                    "xl": "3rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Manrope"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2, h3, .headline { font-family: 'Manrope', sans-serif; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface antialiased min-h-screen">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-white/70 backdrop-blur-xl shadow-sm shadow-black/5">
+<div class="flex items-center justify-between px-6 py-4 w-full max-w-7xl mx-auto">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-blue-600" data-icon="menu">menu</span>
+<span class="text-xl font-black tracking-tighter text-blue-600">EvalMind AI</span>
+</div>
+<div class="hidden md:flex gap-8">
+<span class="text-slate-500 font-medium hover:opacity-80 transition-opacity cursor-pointer">Evaluate</span>
+<span class="text-slate-500 font-medium hover:opacity-80 transition-opacity cursor-pointer">History</span>
+<span class="text-blue-600 font-bold hover:opacity-80 transition-opacity cursor-pointer">Profile</span>
+</div>
+<div class="w-10 h-10 rounded-full bg-surface-container-highest overflow-hidden">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="Close up portrait of a young man with a friendly expression in a modern professional setting with soft daylighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDbM8aVfj0df8jad59GHwGD6bAhuqPmJzoRKPyOspeD6sRJymLV4HTUuDv3aVeapcnu-9UBAR6mOQAdV8dGHB8EBw7WqCOX5dmxrZCtqMYZjxCNV6Xvp4jtvkn95LBGv6rtx1xoMHfAbI7571xon491z8BVIBXLOBUnKvywx8AttoM1_71VGx8I67HGNnZf9_75oCV4wFUvGnRcNmNOwKXff03y7hz775nUQ7xBqreOIXWB5--vl9aRhROSP3aDKc-Zm-dWNJljDDzU"/>
+</div>
+</div>
+</header>
+<main class="max-w-3xl mx-auto pt-32 pb-40 px-6">
+<!-- Hero Profile Section -->
+<section class="flex flex-col items-center mb-16">
+<div class="relative mb-6">
+<div class="w-28 h-28 rounded-full border-4 border-surface-container-lowest shadow-lg overflow-hidden">
+<img alt="Alex Johnson Profile" class="w-full h-full object-cover" data-alt="Professional studio portrait of a man with short hair and a warm smile, high-end photography style with clean background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBmAPAF4dzNTT5HgJ0_K1Lo-Y2lOWkIZMwi0N_pSl2uY0owc1W1mWm7ySR4OFuK4ooV5srXjlpuNSH6IZIzk4DDaLXTs5kXKgGFwpwvaN3wCjvxj0JcsC0G86uXA1uvW3XqMqNknA3gliAmJeRGjbdIz9R51bH6bj0Q7ScYChlfcbSXIep-_UGQTiQpJePfV_M4VJn33sk10lRziBdy42z9jaFH7KkblH4GYLi_z0VTBA9ajLlLwM0C-a5H9czn5GP7B5LplQb7SW8r"/>
+</div>
+<button class="absolute bottom-0 right-0 bg-primary p-2 rounded-full text-white shadow-lg transform active:scale-90 transition-transform">
+<span class="material-symbols-outlined text-sm" data-icon="edit">edit</span>
+</button>
+</div>
+<h1 class="text-3xl font-bold tracking-tight text-on-surface mb-1">Alex Johnson</h1>
+<p class="text-on-surface-variant font-medium">alex.johnson@evalmind.ai</p>
+</section>
+<!-- Account Settings Group -->
+<section class="mb-10">
+<h2 class="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-4 px-2">Account Settings</h2>
+<div class="bg-surface-container-lowest rounded-lg shadow-[0_12px_30px_rgba(26,28,29,0.04)] overflow-hidden">
+<div class="flex items-center justify-between p-5 hover:bg-surface-container-low transition-colors cursor-pointer group">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 flex items-center justify-center bg-blue-50 text-primary rounded-xl">
+<span class="material-symbols-outlined" data-icon="person_outline">person_outline</span>
+</div>
+<div>
+<p class="font-semibold text-[15px]">Personal Information</p>
+<p class="text-xs text-on-surface-variant">Update your name, email, and photo</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors" data-icon="chevron_right">chevron_right</span>
+</div>
+<div class="h-[1px] bg-surface-container-low mx-5"></div>
+<div class="flex items-center justify-between p-5 hover:bg-surface-container-low transition-colors cursor-pointer group">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 flex items-center justify-center bg-blue-50 text-primary rounded-xl">
+<span class="material-symbols-outlined" data-icon="shield">shield</span>
+</div>
+<div>
+<p class="font-semibold text-[15px]">Security &amp; Password</p>
+<p class="text-xs text-on-surface-variant">Manage 2FA and password resets</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors" data-icon="chevron_right">chevron_right</span>
+</div>
+<div class="h-[1px] bg-surface-container-low mx-5"></div>
+<div class="flex items-center justify-between p-5 hover:bg-surface-container-low transition-colors cursor-pointer group">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 flex items-center justify-center bg-blue-50 text-primary rounded-xl">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+</div>
+<div>
+<p class="font-semibold text-[15px]">Billing &amp; Subscription</p>
+<p class="text-xs text-on-surface-variant">Pro Plan • Renews in 12 days</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors" data-icon="chevron_right">chevron_right</span>
+</div>
+</div>
+</section>
+<!-- Preferences Group -->
+<section class="mb-10">
+<h2 class="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-4 px-2">Preferences</h2>
+<div class="bg-surface-container-lowest rounded-lg shadow-[0_12px_30px_rgba(26,28,29,0.04)] overflow-hidden">
+<div class="flex items-center justify-between p-5 hover:bg-surface-container-low transition-colors cursor-pointer group">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 flex items-center justify-center bg-slate-50 text-secondary rounded-xl">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</div>
+<div>
+<p class="font-semibold text-[15px]">Notification Settings</p>
+<p class="text-xs text-on-surface-variant">Configure push and email alerts</p>
+</div>
+</div>
+<div class="w-10 h-6 bg-primary rounded-full relative flex items-center px-1">
+<div class="w-4 h-4 bg-white rounded-full ml-auto shadow-sm"></div>
+</div>
+</div>
+<div class="h-[1px] bg-surface-container-low mx-5"></div>
+<div class="flex items-center justify-between p-5 hover:bg-surface-container-low transition-colors cursor-pointer group">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 flex items-center justify-center bg-slate-50 text-secondary rounded-xl">
+<span class="material-symbols-outlined" data-icon="dark_mode">dark_mode</span>
+</div>
+<div>
+<p class="font-semibold text-[15px]">Appearance</p>
+<p class="text-xs text-on-surface-variant">Current: Light Mode</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors" data-icon="chevron_right">chevron_right</span>
+</div>
+</div>
+</section>
+<!-- Help & Support Group -->
+<section class="mb-10">
+<h2 class="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-4 px-2">Help &amp; Support</h2>
+<div class="bg-surface-container-lowest rounded-lg shadow-[0_12px_30px_rgba(26,28,29,0.04)] overflow-hidden">
+<div class="flex items-center justify-between p-5 hover:bg-surface-container-low transition-colors cursor-pointer group">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 flex items-center justify-center bg-slate-50 text-secondary rounded-xl">
+<span class="material-symbols-outlined" data-icon="help_center">help_center</span>
+</div>
+<div>
+<p class="font-semibold text-[15px]">Support Center</p>
+<p class="text-xs text-on-surface-variant">FAQs and documentation</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant" data-icon="open_in_new">open_in_new</span>
+</div>
+<div class="h-[1px] bg-surface-container-low mx-5"></div>
+<div class="flex items-center justify-between p-5 hover:bg-surface-container-low transition-colors cursor-pointer group text-error">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 flex items-center justify-center bg-error-container text-error rounded-xl">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+</div>
+<div>
+<p class="font-semibold text-[15px]">Sign Out</p>
+<p class="text-xs opacity-70">Logout from current session</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<p class="text-center text-xs text-on-surface-variant/50 mt-8 font-medium">EvalMind AI v2.4.0 • Built for Excellence</p>
+</main>
+<!-- BottomNavBar -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 bg-white/70 backdrop-blur-xl rounded-t-3xl shadow-[0_-12px_30px_rgba(26,28,29,0.06)] px-4 pb-6 pt-3 flex justify-around items-center">
+<div class="flex flex-col items-center justify-center text-slate-400 px-5 py-2 hover:bg-slate-100/50 rounded-2xl transition-all duration-300">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span class="font-manrope text-[11px] font-semibold uppercase tracking-wider mt-1">Evaluate</span>
+</div>
+<div class="flex flex-col items-center justify-center text-slate-400 px-5 py-2 hover:bg-slate-100/50 rounded-2xl transition-all duration-300">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+<span class="font-manrope text-[11px] font-semibold uppercase tracking-wider mt-1">History</span>
+</div>
+<div class="flex flex-col items-center justify-center text-blue-600 bg-blue-50 rounded-2xl px-5 py-2 scale-105 transition-all duration-300 ease-out">
+<span class="material-symbols-outlined" data-icon="person" style="font-variation-settings: 'FILL' 1;">person</span>
+<span class="font-manrope text-[11px] font-semibold uppercase tracking-wider mt-1">Profile</span>
+</div>
+</nav>
+</body></html>

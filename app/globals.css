@@ -1,0 +1,58 @@
+@import "tailwindcss";
+@config "../tailwind.config.ts";
+
+body {
+    background-color: #f5f5f7;
+    color: #1d1d1f;
+    min-height: 100vh;
+}
+
+.material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+}
+
+.glass-nav {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.apple-card {
+    background: #ffffff;
+    border-radius: 20px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(0, 0, 0, 0.02);
+}
+
+.primary-gradient {
+    background: linear-gradient(135deg, #007aff 0%, #0051a8 100%);
+    color: white;
+}
+
+.primary-gradient:hover {
+    box-shadow: 0 8px 16px rgba(0, 122, 255, 0.3);
+    transform: translateY(-1px);
+}
+
+.apple-input {
+    background: #ffffff;
+    border: 1px solid #d2d2d7;
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-size: 16px;
+    transition: all 0.2s ease;
+}
+
+.apple-input:focus {
+    border-color: #007aff;
+    box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.1);
+    outline: none;
+}
+
+/* Base button animations */
+button {
+    transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+button:active {
+    transform: scale(0.96);
+}

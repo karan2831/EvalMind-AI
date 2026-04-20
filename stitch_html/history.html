@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>EvalMind AI - Evaluation History</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-primary-container": "#fcfbff",
+                    "primary-fixed": "#d7e2ff",
+                    "on-secondary": "#ffffff",
+                    "primary": "#0059b5",
+                    "error-container": "#ffdad6",
+                    "secondary": "#5e5e63",
+                    "surface": "#f9f9fb",
+                    "on-secondary-fixed": "#1a1b1f",
+                    "surface-tint": "#005cbb",
+                    "surface-bright": "#f9f9fb",
+                    "error": "#ba1a1a",
+                    "surface-container": "#eeeef0",
+                    "outline": "#717785",
+                    "surface-variant": "#e2e2e4",
+                    "secondary-fixed-dim": "#c7c6cb",
+                    "tertiary-container": "#747375",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary-fixed-variant": "#46464b",
+                    "inverse-on-surface": "#f0f0f2",
+                    "on-tertiary-fixed-variant": "#474649",
+                    "on-error": "#ffffff",
+                    "outline-variant": "#c1c6d6",
+                    "surface-dim": "#d9dadc",
+                    "on-surface-variant": "#414753",
+                    "on-tertiary-container": "#fdfafc",
+                    "inverse-primary": "#abc7ff",
+                    "tertiary": "#5b5b5d",
+                    "on-surface": "#1a1c1d",
+                    "on-primary": "#ffffff",
+                    "tertiary-fixed-dim": "#c8c6c8",
+                    "tertiary-fixed": "#e4e2e4",
+                    "on-primary-fixed-variant": "#00458f",
+                    "on-secondary-container": "#626267",
+                    "on-tertiary-fixed": "#1b1b1d",
+                    "surface-container-low": "#f3f3f5",
+                    "surface-container-highest": "#e2e2e4",
+                    "secondary-container": "#e0dfe4",
+                    "inverse-surface": "#2f3132",
+                    "primary-fixed-dim": "#abc7ff",
+                    "on-error-container": "#93000a",
+                    "surface-container-lowest": "#ffffff",
+                    "on-primary-fixed": "#001b3f",
+                    "surface-container-high": "#e8e8ea",
+                    "secondary-fixed": "#e3e2e7",
+                    "on-background": "#1a1c1d",
+                    "primary-container": "#0071e3",
+                    "background": "#f9f9fb"
+            },
+            "borderRadius": {
+                    "DEFAULT": "1rem",
+                    "lg": "2rem",
+                    "xl": "3rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Manrope"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #f9f9fb; }
+        .font-headline { font-family: 'Manrope', sans-serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .glass-nav { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(20px); }
+        .history-card-shadow { shadow: 0 12px 30px rgba(26, 28, 29, 0.06); }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="text-on-surface bg-surface min-h-screen selection:bg-primary-fixed selection:text-on-primary-fixed">
+<!-- TopAppBar -->
+<header class="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl fixed top-0 w-full z-50 shadow-sm shadow-black/5">
+<div class="flex items-center justify-between px-6 py-4 w-full max-w-7xl mx-auto">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-blue-600 dark:text-blue-400 cursor-pointer hover:opacity-80 transition-opacity" data-icon="menu">menu</span>
+<h1 class="text-xl font-black tracking-tighter text-blue-600 dark:text-blue-400">EvalMind AI</h1>
+</div>
+<div class="hidden md:flex items-center gap-8">
+<a class="text-slate-500 font-medium hover:opacity-80 transition-opacity font-manrope" href="#">Evaluate</a>
+<a class="text-blue-600 font-bold hover:opacity-80 transition-opacity font-manrope" href="#">History</a>
+<a class="text-slate-500 font-medium hover:opacity-80 transition-opacity font-manrope" href="#">Profile</a>
+</div>
+<div class="flex items-center">
+<div class="w-10 h-10 rounded-full bg-surface-container overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="minimalist close-up portrait of a professional man with clean lighting and neutral soft background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDaUKhf20vROE9UbXEMSCZTgvmbszmr4cqGtqqDBWhGBoqNkIq5j9JxssCoyUwEuI0xctHoWtqYGXljC7zBpPBcC_PyzimsXmN-wSts_UECvDvbu1iRGPzuZtrsOh9iNzsgdpIdFiZVX0eF2Py93fJZ2tFUcbERFED14g4ZaRxdPtXAfAEhhuQrHVGz3HvyCHLV5yT87l-m-jBcEWMpoqMISzZ-U4_yMPCbp7mGDepZoyjK_RuQ2_LC7i2CrtI4EnRHUtjiacRU_p_D"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="pt-28 pb-32 px-6 max-w-5xl mx-auto">
+<!-- Header Section -->
+<div class="mb-12">
+<h2 class="font-headline text-4xl font-extrabold tracking-tight text-on-surface mb-2">Evaluation History</h2>
+<p class="text-on-surface-variant body-lg opacity-70">Review your past academic assessments and progress metrics.</p>
+</div>
+<!-- Filter/Action Row (Subtle, no lines) -->
+<div class="flex items-center justify-between mb-10 gap-4 overflow-x-auto pb-2 scrollbar-hide">
+<div class="flex items-center gap-2">
+<button class="px-5 py-2.5 rounded-full bg-primary text-white font-semibold text-sm hover:opacity-90 transition-all scale-100 active:scale-95">All Assessments</button>
+<button class="px-5 py-2.5 rounded-full bg-surface-container-highest text-on-surface font-semibold text-sm hover:opacity-80 transition-all">Theoretical</button>
+<button class="px-5 py-2.5 rounded-full bg-surface-container-highest text-on-surface font-semibold text-sm hover:opacity-80 transition-all">Practical</button>
+</div>
+<button class="flex items-center gap-2 px-4 py-2 text-on-surface-variant font-medium hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[20px]" data-icon="filter_list">filter_list</span>
+<span class="text-sm">Filter</span>
+</button>
+</div>
+<!-- History List (Asymmetric Bento-ish Layout) -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
+<!-- Featured Latest History Card -->
+<div class="lg:col-span-12 group">
+<div class="bg-surface-container-lowest rounded-lg p-8 shadow-[0_12px_30px_rgba(26,28,29,0.06)] hover:shadow-[0_16px_40px_rgba(26,28,29,0.1)] transition-all duration-500 border border-transparent hover:border-outline-variant/10 cursor-pointer">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+<div class="flex-1">
+<div class="flex items-center gap-3 mb-3">
+<span class="px-2.5 py-1 rounded-md bg-primary-fixed text-on-primary-fixed-variant text-[10px] font-bold uppercase tracking-widest">Newest</span>
+<span class="text-on-surface-variant text-xs font-medium">May 24, 2024 • 14:20</span>
+</div>
+<h3 class="font-headline text-2xl font-bold text-on-surface mb-3 leading-tight">Advanced Quantum Mechanics: Particle Wave Duality &amp; Harmonic Oscillators</h3>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[18px]" data-icon="description">description</span>
+<span class="text-on-surface-variant text-sm font-medium">12 Questions</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[18px]" data-icon="timer">timer</span>
+<span class="text-on-surface-variant text-sm font-medium">45m duration</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-8">
+<div class="relative w-24 h-24">
+<svg class="w-full h-full transform -rotate-90">
+<circle class="text-surface-container-high" cx="48" cy="48" fill="transparent" r="40" stroke="currentColor" stroke-width="6"></circle>
+<circle class="text-primary" cx="48" cy="48" fill="transparent" r="40" stroke="currentColor" stroke-dasharray="251.2" stroke-dashoffset="37.68" stroke-width="6"></circle>
+</svg>
+<div class="absolute inset-0 flex items-center justify-center">
+<span class="font-headline font-extrabold text-xl text-primary">85<span class="text-xs opacity-60">/100</span></span>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:translate-x-1 transition-transform" data-icon="arrow_forward_ios">arrow_forward_ios</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Smaller Items Grid -->
+<!-- Item 1 -->
+<div class="lg:col-span-6">
+<div class="bg-surface-container-lowest rounded-lg p-6 shadow-[0_12px_30px_rgba(26,28,29,0.06)] hover:shadow-lg transition-all cursor-pointer">
+<div class="flex justify-between items-start mb-6">
+<div class="w-12 h-12 bg-surface-container rounded-xl flex items-center justify-center">
+<span class="material-symbols-outlined text-primary" data-icon="calculate">calculate</span>
+</div>
+<div class="text-right">
+<div class="font-headline font-bold text-2xl text-on-surface">92<span class="text-sm font-medium text-on-surface-variant">/100</span></div>
+<div class="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">Excellent</div>
+</div>
+</div>
+<h4 class="font-headline font-bold text-lg text-on-surface mb-2">Introduction to Stochastic Processes</h4>
+<p class="text-on-surface-variant text-sm mb-4 line-clamp-2">Evaluation on Markov chains, probability distributions, and random walks theory.</p>
+<div class="flex items-center justify-between text-xs text-on-surface-variant border-t border-surface-container-low pt-4">
+<span>May 18, 2024</span>
+<span class="font-bold">MATH-402</span>
+</div>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="lg:col-span-6">
+<div class="bg-surface-container-lowest rounded-lg p-6 shadow-[0_12px_30px_rgba(26,28,29,0.06)] hover:shadow-lg transition-all cursor-pointer">
+<div class="flex justify-between items-start mb-6">
+<div class="w-12 h-12 bg-surface-container rounded-xl flex items-center justify-center">
+<span class="material-symbols-outlined text-primary" data-icon="dna">genetics</span>
+</div>
+<div class="text-right">
+<div class="font-headline font-bold text-2xl text-on-surface">74<span class="text-sm font-medium text-on-surface-variant">/100</span></div>
+<div class="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">Passing</div>
+</div>
+</div>
+<h4 class="font-headline font-bold text-lg text-on-surface mb-2">Cellular Biology &amp; Genetics</h4>
+<p class="text-on-surface-variant text-sm mb-4 line-clamp-2">Detailed analysis of CRISPR-Cas9 mechanisms and hereditary transcription patterns.</p>
+<div class="flex items-center justify-between text-xs text-on-surface-variant border-t border-surface-container-low pt-4">
+<span>May 12, 2024</span>
+<span class="font-bold">BIO-210</span>
+</div>
+</div>
+</div>
+<!-- Item 3 - Long Card -->
+<div class="lg:col-span-12">
+<div class="bg-surface-container rounded-lg p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:bg-surface-container-high transition-colors cursor-pointer group">
+<div class="flex items-center gap-5">
+<div class="bg-white p-3 rounded-full shadow-sm">
+<span class="material-symbols-outlined text-primary" data-icon="psychology">psychology</span>
+</div>
+<div>
+<h4 class="font-headline font-bold text-on-surface">Cognitive Psychology: Memory Models</h4>
+<p class="text-on-surface-variant text-sm">May 05, 2024 • 25 Questions</p>
+</div>
+</div>
+<div class="flex items-center gap-12">
+<div class="text-center">
+<div class="font-headline font-extrabold text-on-surface">68/100</div>
+<div class="text-[10px] text-error font-bold uppercase">Needs Review</div>
+</div>
+<div class="hidden md:block w-[120px] h-2 bg-white rounded-full overflow-hidden">
+<div class="h-full bg-error w-[68%]"></div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:translate-x-1 transition-transform" data-icon="chevron_right">chevron_right</span>
+</div>
+</div>
+</div>
+<!-- Decorative Inserts for High-End feel -->
+<div class="lg:col-span-12 mt-4 text-center">
+<div class="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-white shadow-sm border border-outline-variant/10 text-on-surface-variant text-sm">
+<span class="material-symbols-outlined text-primary text-[18px]" data-icon="info">info</span>
+                    You've completed <span class="font-bold text-on-surface">14 evaluations</span> this month. Great progress!
+                </div>
+</div>
+</div>
+</main>
+<!-- FAB (Suppressed on History screen according to shell logic, but included if primary action is needed. User prompt implies browsing history so suppression is likely. Skipping FAB to follow Shell Visibility Rules.) -->
+<!-- BottomNavBar -->
+<nav class="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl fixed bottom-0 w-full z-50 rounded-t-3xl shadow-[0_-12px_30px_rgba(26,28,29,0.06)] md:hidden">
+<div class="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-6 pt-3">
+<a class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 px-5 py-2 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 rounded-2xl transition-all duration-300 ease-out" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span class="font-manrope text-[11px] font-semibold uppercase tracking-wider mt-1">Evaluate</span>
+</a>
+<a class="flex flex-col items-center justify-center text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 rounded-2xl px-5 py-2 scale-105 transition-all duration-300 ease-out" href="#">
+<span class="material-symbols-outlined" data-icon="history" style="font-variation-settings: 'FILL' 1;">history</span>
+<span class="font-manrope text-[11px] font-semibold uppercase tracking-wider mt-1">History</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 px-5 py-2 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 rounded-2xl transition-all duration-300 ease-out" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-manrope text-[11px] font-semibold uppercase tracking-wider mt-1">Profile</span>
+</a>
+</div>
+</nav>
+</body></html>
