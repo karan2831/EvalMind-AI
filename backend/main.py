@@ -1,26 +1,74 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, validator
 from typing import List, Optional, Dict
 import os
 import re
+import time
 import fitz # PyMuPDF
+import logging
+
+# Configure Logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("EvalMindSecurity")
 
 app = FastAPI(title="EvalMind AI Backend")
 
-# CORS Setup
+# ==========================================
+# PART 1: SECURITY - RATE LIMITING
+# ==========================================
+# Simple IP-based Rate Limiter (In-Memory)
+rate_limit_store = {}
+RATE_LIMIT_MAX = 20
+RATE_LIMIT_WINDOW = 60 # Seconds
+
+async def check_rate_limit(request: Request):
+    client_ip = request.client.host
+    now = time.time()
+    
+    # Initialize or clean up old entries
+    if client_ip not in rate_limit_store:
+        rate_limit_store[client_ip] = []
+    
+    # Keep only requests within the window
+    rate_limit_store[client_ip] = [t for t in rate_limit_store[client_ip] if now - t < RATE_LIMIT_WINDOW]
+    
+    if len(rate_limit_store[client_ip]) >= RATE_LIMIT_MAX:
+        logger.warning(f"Rate limit exceeded for IP: {client_ip}")
+        raise HTTPException(status_code=429, detail="Too many requests. Please try again later.")
+    
+    rate_limit_store[client_ip].append(now)
+
+# ==========================================
+# PART 2: SECURITY - CORS & HEADERS
+# ==========================================
+# PROD: Replace with actual frontend domains
+ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "https://evalmind-ai.vercel.app", # Example Vercel Domain
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
+# ==========================================
+# PART 3: INPUT VALIDATION (PYDANTIC)
+# ==========================================
 class EvaluationRequest(BaseModel):
-    question: str
-    answer: str
-    marks: int = 5
+    question: str = Field(..., min_length=5, max_length=5000)
+    answer: str = Field(..., min_length=5, max_length=10000)
+    marks: int = Field(..., description="Must be 2, 5, or 10")
+
+    @validator("marks")
+    def validate_marks(cls, v):
+        if v not in [2, 5, 10]:
+            raise ValueError("Marks must be 2, 5, or 10")
+        return v
 
 class ScoreBreakdown(BaseModel):
     coverage: float
@@ -45,12 +93,12 @@ class EvaluationResponse(BaseModel):
     mistake_explanations: List[str]
     summary: str
     result_label: str
-    improvement_plan: str # NEW: "Where you can improve" comparison
-    learning_outcome: str # NEW: Closing learning statement
+    improvement_plan: str
+    learning_outcome: str
     extracted_text_preview: Optional[str] = None
 
 # ==========================================
-# PART 1: DYNAMIC KNOWLEDGE ENGINE
+# PART 4: DYNAMIC KNOWLEDGE ENGINE
 # ==========================================
 DOMAIN_KNOWLEDGE = {
     "photosynthesis": {
@@ -154,28 +202,48 @@ def calculate_metrics(student_answer: str, key_points: List[str], marks: int):
     else: detected_level = "10-mark level"
     return cov, depth, clarity, missing, detected_level
 
-@app.post("/evaluate-pdf")
+# ==========================================
+# PART 5: PROTECTED ENDPOINTS
+# ==========================================
+@app.post("/evaluate-pdf", dependencies=[Depends(check_rate_limit)])
 async def evaluate_pdf(
     file: UploadFile = File(...),
     marks: int = Form(...),
     mode: str = Form(...),
     question: Optional[str] = Form(None)
 ):
-    if not file.filename.endswith('.pdf'): raise HTTPException(status_code=400, detail="Upload a PDF.")
+    # Security: File Type Check
+    if not file.filename.lower().endswith('.pdf') or file.content_type != 'application/pdf':
+        raise HTTPException(status_code=400, detail="Invalid file type. Please upload a PDF.")
+    
     try:
+        # Security: File Size Check (10MB)
         contents = await file.read()
+        if len(contents) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="PDF too large. Max 10MB allowed.")
+            
         doc = fitz.open(stream=contents, filetype="pdf")
-        if len(doc) > 10: raise HTTPException(status_code=400, detail="Max 10 pages.")
+        if len(doc) > 10:
+            doc.close()
+            raise HTTPException(status_code=400, detail="PDF has too many pages. Max 10 allowed.")
+        
         txt = ""
         for page in doc: txt += page.get_text()
         doc.close()
-        if not txt.strip(): raise HTTPException(status_code=400, detail="Scanned PDF detected.")
+        
+        if not txt.strip(): raise HTTPException(status_code=400, detail="Scanned PDF detected. OCR not supported.")
+        
+        # Security: Input Validation for Multipart Form
+        if marks not in [2, 5, 10]: raise HTTPException(status_code=400, detail="Marks must be 2, 5, or 10")
+        if len(txt) > 20000: raise HTTPException(status_code=400, detail="PDF content too long.")
+
         if mode == "answer_sheet":
+            if not question or len(question) < 5: raise HTTPException(status_code=400, detail="Question is too short.")
             return await evaluate_answer(EvaluationRequest(question=question, answer=txt, marks=marks))
         elif mode == "combined":
             pattern = re.compile(r'(?:Question|Q):?\s*(.*?)\s*(?:Answer|A):?\s*(.*?)(?=(?:Question|Q):|$)', re.DOTALL | re.IGNORECASE)
             pairs = pattern.findall(txt)
-            if not pairs: raise HTTPException(status_code=400, detail="No questions found.")
+            if not pairs: raise HTTPException(status_code=400, detail="No Q&A pairs found in PDF.")
             total = 0
             evs = []
             for q, a in pairs:
@@ -183,69 +251,55 @@ async def evaluate_pdf(
                 evs.append({"question": q, "result": res})
                 total += res.score
             return {"evaluations": evs, "total_score": total, "total_max_score": len(evs)*marks, "count": len(evs), "extracted_text_preview": txt[:300]}
+        else: raise HTTPException(status_code=400, detail="Invalid evaluation mode.")
+        
     except HTTPException as he: raise he
-    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        logger.error(f"Internal Error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Something went wrong. Please try again.")
 
-@app.post("/evaluate", response_model=EvaluationResponse)
+@app.post("/evaluate", response_model=EvaluationResponse, dependencies=[Depends(check_rate_limit)])
 async def evaluate_answer(request: EvaluationRequest):
-    if not request.answer.strip(): raise HTTPException(status_code=400, detail="Empty answer")
-    ideal, key_points, exp_map = generate_ideal_answer(request.question, request.marks)
-    cov, depth, clarity, missing, det_lvl = calculate_metrics(request.answer, key_points, request.marks)
-    
-    scoring = ScoreBreakdown(coverage=cov, depth=depth, clarity=clarity)
-    confidence = (cov * 0.6 + clarity * 0.4)
-    raw_score = (cov * 0.5 + depth * 0.3 + clarity * 0.2) * request.marks
-    final_score = min(max(1, int(round(raw_score))), request.marks)
+    try:
+        ideal, key_points, exp_map = generate_ideal_answer(request.question, request.marks)
+        cov, depth, clarity, missing, det_lvl = calculate_metrics(request.answer, key_points, request.marks)
+        
+        scoring = ScoreBreakdown(coverage=cov, depth=depth, clarity=clarity)
+        confidence = (cov * 0.6 + clarity * 0.4)
+        raw_score = (cov * 0.5 + depth * 0.3 + clarity * 0.2) * request.marks
+        final_score = min(max(1, int(round(raw_score))), request.marks)
 
-    # RESULT LABEL
-    percentage = (final_score / request.marks) * 100
-    if percentage >= 85: result_label = "Excellent Answer"
-    elif percentage >= 50: result_label = "Good Answer"
-    else: result_label = "Needs Improvement"
+        percentage = (final_score / request.marks) * 100
+        if percentage >= 85: result_label = "Excellent Answer"
+        elif percentage >= 50: result_label = "Good Answer"
+        else: result_label = "Needs Improvement"
 
-    # REFINED HUMAN-LIKE FEEDBACK
-    prefix = "Good start! " if final_score >= request.marks * 0.4 else "Nice attempt! "
-    next_step = " Next time, try adding more explanation or examples to your points." if final_score < request.marks else " You have a deep understanding of this topic."
+        prefix = "Good start! " if final_score >= request.marks * 0.4 else "Nice attempt! "
+        next_step = " Next time, try adding more explanation or examples." if final_score < request.marks else " Great job!"
 
-    if final_score == request.marks:
-        summary = "Your answer is well-structured and complete."
-        feedback_simple = f"{prefix}Your answer is very clear and covers everything I was looking for.{next_step}"
-        improvement_plan = "You've mastered this topic! To push further, try explaining related advanced concepts."
-    elif final_score >= request.marks * 0.7:
-        summary = "Your answer is good but needs more explanation."
-        feedback_simple = f"{prefix}You have the right ideas, but you missed a few details that would make it perfect.{next_step}"
-        improvement_plan = f"You are very close to full marks. The main difference is the level of detail. While the ideal answer explains the 'why', yours focuses on the 'what'. Adding more 'because' statements will help."
-    else:
-        summary = "Your answer is too short and misses key points."
-        feedback_simple = f"{prefix}Your answer is a bit too short and misses some important points we discussed.{next_step}"
-        improvement_plan = "Your current answer lacks the structure and depth needed for high marks. Try breaking your answer into an introduction, 3 main points, and a conclusion to match the model answer."
+        if final_score == request.marks:
+            summary = "Your answer is well-structured and complete."
+            feedback_simple = f"{prefix}Your answer covers everything.{next_step}"
+            improvement_plan = "You've mastered this topic!"
+        else:
+            summary = "Your answer needs more detail."
+            feedback_simple = f"{prefix}You missed some key points.{next_step}"
+            improvement_plan = "Try to explain the 'why' behind each point."
 
-    mistakes = []
-    req_lvl = f"{request.marks}-mark level"
-    if det_lvl != req_lvl and request.marks > 2:
-        mistakes.append(f"This answer is okay for 2 marks, but for {request.marks} marks you need to explain things in more detail.")
-    
-    for m in missing:
-        expl = exp_map.get(m, f"You missed a key part: {m}.")
-        mistakes.append(expl)
-    
-    if len(mistakes) == 0:
-        mistakes.append("Everything looks great! No major mistakes found.")
-    else:
-        mistakes.append(f"Try to add these points to get the full {request.marks} marks next time.")
+        mistakes = [exp_map.get(m, f"You missed {m}.") for m in missing[:3]]
+        breakdown = [BreakdownItem(concept=c, score=f"{int(s*100)}%") for c, s in zip(["Coverage", "Depth", "Clarity"], [cov, depth, clarity])]
 
-    breakdown = [BreakdownItem(concept="Coverage", score=f"{int(cov*100)}%"), BreakdownItem(concept="Depth", score=f"{int(depth*100)}%"), BreakdownItem(concept="Clarity", score=f"{int(clarity*100)}%")]
-
-    return EvaluationResponse(
-        score=final_score, max_score=request.marks, breakdown=breakdown, scoring_breakdown=scoring,
-        confidence=round(confidence, 2), missing_points=missing[:3], ideal_answer=ideal,
-        detected_level=det_lvl, feedback=f"Assessment Complete",
-        feedback_simple=feedback_simple, mistake_explanations=mistakes, 
-        summary=summary, result_label=result_label,
-        improvement_plan=improvement_plan,
-        learning_outcome="After this feedback, you should be able to answer this question with full marks.",
-        extracted_text_preview=request.answer[:300]
-    )
+        return EvaluationResponse(
+            score=final_score, max_score=request.marks, breakdown=breakdown, scoring_breakdown=scoring,
+            confidence=round(confidence, 2), missing_points=missing[:3], ideal_answer=ideal,
+            detected_level=det_lvl, feedback="Evaluation Complete",
+            feedback_simple=feedback_simple, mistake_explanations=mistakes, 
+            summary=summary, result_label=result_label, improvement_plan=improvement_plan,
+            learning_outcome="You're getting better!", extracted_text_preview=request.answer[:300]
+        )
+    except Exception as e:
+        logger.error(f"Evaluation Error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Something went wrong.")
 
 if __name__ == "__main__":
     import uvicorn
