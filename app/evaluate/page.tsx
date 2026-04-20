@@ -43,9 +43,7 @@ export default function EvaluatePage() {
 
       const finalQuestion = isCustom ? customQuestion : selectedQuestion;
 
-      console.log("Final Question:", finalQuestion);
-      console.log("Answer:", userAnswer);
-      console.log("Marks:", marks);
+      console.log("Sending:", { question: finalQuestion, answer: userAnswer, marks: marks });
 
       // Validation
       if (!finalQuestion || finalQuestion.trim().length < 5) {
@@ -77,6 +75,8 @@ export default function EvaluatePage() {
       }
       
       const data = await response.json();
+      console.log("Response:", data);
+      
       setResult(data);
       setActiveTab('overview');
 
@@ -92,7 +92,7 @@ export default function EvaluatePage() {
         });
       }
     } catch (err) {
-      console.error(err);
+      console.error("Evaluation error:", err);
       setError("Evaluation failed. Try again.");
     } finally {
       setLoading(false);
