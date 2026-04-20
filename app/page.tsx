@@ -3,6 +3,7 @@
 import NavBar from '@/app/components/NavBar';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import Footer from '@/app/components/Footer';
 
 export default function LandingPage() {
   const router = useRouter();
@@ -61,7 +62,8 @@ export default function LandingPage() {
             <span className="text-blue-600">Fair Evaluation</span>
           </h1>
           <p className="mt-6 text-lg md:text-xl text-gray-500 max-w-2xl font-medium leading-relaxed">
-            Evaluate subjective answers instantly with AI-powered feedback, structured scoring, and actionable learning insights.
+            Improve your answers, not just your marks. <br className="hidden md:block" />
+            Evaluate subjective answers instantly with AI-powered feedback and structured scoring.
           </p>
           
           <div className="mt-10 flex flex-col sm:flex-row gap-4">
@@ -99,7 +101,7 @@ export default function LandingPage() {
             <h2 className="mt-4 text-3xl font-bold text-gray-900">Professional Grade Interface</h2>
           </div>
           
-          <div className="relative mx-auto max-w-5xl rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-10 duration-1000">
+          <div className="relative mx-auto max-w-5xl rounded-2xl border border-gray-200 bg-white shadow-xl shadow-gray-200/50 overflow-hidden animate-in fade-in slide-in-from-bottom-10 duration-1000">
             {/* Mock Dashboard Header */}
             <div className="h-12 border-b border-gray-100 bg-gray-50/50 flex items-center px-6 gap-2">
               <div className="flex gap-1.5">
@@ -222,26 +224,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-16 px-6 border-t border-gray-50">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-white border border-gray-100 shadow-sm p-1">
-              <Image src="/logo.jpeg" alt="Logo" width={32} height={32} className="rounded-md" />
-            </div>
-            <span className="font-bold text-gray-900 tracking-tight">EvalMind AI</span>
-          </div>
-          
-          <div className="flex gap-8 text-sm font-bold text-gray-400 uppercase tracking-widest">
-            <a href="#" className="hover:text-blue-600 transition-colors">Features</a>
-            <a href="#" className="hover:text-blue-600 transition-colors">Pricing</a>
-            <a href="#" className="hover:text-blue-600 transition-colors">About</a>
-            <a href="#" className="hover:text-blue-600 transition-colors">Contact</a>
-          </div>
-          
-          <p className="text-sm font-medium text-gray-400">© 2024 EvalMind AI. All rights reserved.</p>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

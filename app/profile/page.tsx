@@ -4,6 +4,7 @@ import NavBar from '@/app/components/NavBar';
 import { supabase } from '@/lib/supabaseClient';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Footer from '@/app/components/Footer';
 
 export default function ProfilePage() {
   const [user, setUser] = useState<any>(null);
@@ -108,6 +109,7 @@ export default function ProfilePage() {
           </div>
         </section>
       </main>
+      <Footer />
     </div>
   );
 }

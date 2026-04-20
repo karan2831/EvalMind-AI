@@ -3,6 +3,7 @@
 import NavBar from '@/app/components/NavBar';
 import { supabase } from '@/lib/supabaseClient';
 import { useState, useEffect } from 'react';
+import Footer from '@/app/components/Footer';
 
 const PREDEFINED_QUESTIONS = [
   "Explain the process of photosynthesis in plants.",
@@ -34,6 +35,7 @@ export default function EvaluatePage() {
   const [summary, setSummary] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingMsg, setLoadingMsg] = useState<string>("Processing...");
+  const [showSuccess, setShowSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [user, setUser] = useState<any>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -202,6 +204,8 @@ export default function EvaluatePage() {
       setEvaluations(data.evaluations);
       setSummary({ total_score: data.total_score, total_max_score: data.total_max_score, count: data.count, preview: data.extracted_text_preview });
       setResult(data.evaluations[0].result);
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 5000);
     } else {
       setResult(data);
       setSummary({ preview: data.extracted_text_preview });
@@ -209,6 +213,8 @@ export default function EvaluatePage() {
         setReevaluateMsg(data.score === prevScore ? "Result is consistent" : "Update detected");
       }
       if (q && a) saveHistory(q, a, data);
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 5000);
     }
   };
 
@@ -361,24 +367,64 @@ export default function EvaluatePage() {
               </div>
             )}
           </div>
-          {error && <div className="text-sm text-red-600 font-bold text-center px-4 py-4 bg-red-50 rounded-xl border border-red-100 animate-in fade-in slide-in-from-top-2">{error}</div>}
+          {error && (
+            <div className="mb-4 p-6 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-4 animate-in fade-in slide-in-from-top-4 duration-300">
+              <div className="w-10 h-10 bg-white rounded-xl shadow-sm border border-red-100 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-red-500">error</span>
+              </div>
+              <div>
+                <h4 className="text-red-900 font-bold mb-1">Evaluation Note</h4>
+                <p className="text-red-700 text-sm font-medium leading-relaxed">{error}</p>
+                <button onClick={() => setError(null)} className="mt-3 text-xs font-bold text-red-600 uppercase tracking-widest hover:underline">Dismiss</button>
+              </div>
+            </div>
+          )}
           <div className="flex justify-end pt-4">
             <button 
               onClick={() => handleEvaluate(false)} 
               disabled={loading || (inputMode === 'manual' ? userAnswer.trim().length === 0 : !selectedFile)} 
               className="bg-blue-600 text-white rounded-xl px-12 py-4.5 font-bold flex items-center gap-3 disabled:opacity-50 active:scale-[0.98] transition-all duration-200 shadow-lg hover:bg-blue-700 hover:shadow-blue-600/20 hover:shadow-xl"
             >
-              {loading ? <><span className="material-symbols-outlined animate-spin text-xl">sync</span><span className="tracking-wide">{loadingMsg}</span></> : <><span className="tracking-wide">Begin Evaluation</span><span className="material-symbols-outlined text-2xl">auto_awesome</span></>}
+              {loading ? (
+                <>
+                  <span className="material-symbols-outlined animate-spin text-xl">sync</span>
+                  <div className="flex flex-col items-start leading-tight">
+                    <span className="tracking-wide">Analyzing...</span>
+                    <span className="text-[10px] font-medium opacity-80">{loadingMsg}</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <span className="tracking-wide">Begin Evaluation</span>
+                  <span className="material-symbols-outlined text-2xl">auto_awesome</span>
+                </>
+              )}
             </button>
           </div>
         </section>
 
+        {/* Success Feedback Toast */}
+        {showSuccess && (
+          <div className="fixed top-24 right-6 z-50 animate-in slide-in-from-right-10 fade-in duration-500">
+             <div className="bg-white border border-green-100 shadow-2xl shadow-green-600/10 rounded-2xl p-4 flex items-center gap-4 pr-8">
+                <div className="w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center shadow-lg shadow-green-500/20">
+                  <span className="material-symbols-outlined text-white">check_circle</span>
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-gray-900">Evaluation Complete</p>
+                  <p className="text-xs text-gray-500 font-medium">Your insights are ready below.</p>
+                </div>
+             </div>
+          </div>
+        )}
+
         {!result && !loading && (
-          <div className="py-20 text-center animate-in fade-in duration-700">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-50 text-gray-300 mb-6">
-              <span className="material-symbols-outlined text-3xl">analytics</span>
+          <div className="bg-white border border-gray-100 rounded-[2rem] p-16 text-center shadow-sm animate-in fade-in duration-700">
+            <div className="w-20 h-20 bg-gray-50 rounded-2xl flex items-center justify-center mb-6 mx-auto text-gray-300">
+              <span className="material-symbols-outlined text-4xl">analytics</span>
             </div>
-            <p className="text-gray-500 font-medium text-lg">Enter an answer or upload a PDF to begin evaluation</p>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">Ready to evaluate?</h3>
+            <p className="text-gray-500 max-w-sm mx-auto font-medium leading-relaxed">Submit your answer or upload a PDF to see a detailed breakdown of your performance, rubric scores, and improvement tips.</p>
           </div>
         )}
 
@@ -573,6 +619,7 @@ export default function EvaluatePage() {
           </section>
         )}
       </main>
+      <Footer />
     </div>
   );
 }
