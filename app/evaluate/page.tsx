@@ -140,17 +140,28 @@ export default function EvaluatePage() {
 
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
-      const authHeader = token ? { "Authorization": `Bearer ${token}` } : {};
 
       if (inputMode === 'manual') {
+        const headers: HeadersInit = {
+          "Content-Type": "application/json",
+        };
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
+
         console.log("API URL:", `${apiUrl}/evaluate`);
         const res = await fetchWithRetry(`${apiUrl}/evaluate`, {
           method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeader },
+          headers,
           body: JSON.stringify({ question: finalQuestion.trim(), answer: userAnswer.trim(), marks })
         });
         await processResponse(res, isReevaluate, finalQuestion.trim(), userAnswer.trim());
       } else {
+        const headers: HeadersInit = {};
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
+
         console.log("API URL:", `${apiUrl}/evaluate-pdf`);
         const formData = new FormData();
         formData.append('file', selectedFile!);
@@ -161,7 +172,7 @@ export default function EvaluatePage() {
         const res = await fetchWithRetry(`${apiUrl}/evaluate-pdf`, { 
           method: "POST", 
           body: formData,
-          headers: authHeader
+          headers
         });
         await processResponse(res, isReevaluate);
       }
