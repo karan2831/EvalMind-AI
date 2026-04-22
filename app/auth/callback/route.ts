@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -9,13 +9,11 @@ export async function GET(request: Request) {
 
   // Google returned an error (e.g. user cancelled login)
   if (oauthError) {
-    console.warn("OAuth cancelled or denied:", oauthError);
     return NextResponse.redirect(`${origin}/login?error=Login cancelled`);
   }
 
-  // No code and no error — unexpected state, send back to login
   if (!code) {
-    return NextResponse.redirect(`${origin}/login`);
+    return NextResponse.redirect(`${origin}/login?error=No code`);
   }
 
   try {
@@ -26,13 +24,11 @@ export async function GET(request: Request) {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
-          get(name) {
-            return cookieStore.get(name)?.value;
-          },
-          set(name, value, options) {
+          get: (name) => cookieStore.get(name)?.value,
+          set: (name, value, options) => {
             cookieStore.set({ name, value, ...options });
           },
-          remove(name, options) {
+          remove: (name, options) => {
             cookieStore.set({ name, value: "", ...options });
           },
         },
@@ -40,11 +36,15 @@ export async function GET(request: Request) {
     );
 
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (error) throw error;
+
+    if (error) {
+      console.error("OAuth exchange error:", error);
+      return NextResponse.redirect(`${origin}/login?error=OAuth failed`);
+    }
 
     return NextResponse.redirect(`${origin}/evaluate`);
   } catch (err) {
-    console.error("OAuth error:", err);
+    console.error("Callback route error:", err);
     return NextResponse.redirect(`${origin}/login?error=Authentication failed`);
   }
 }
