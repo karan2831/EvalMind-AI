@@ -74,10 +74,16 @@ function LoginForm() {
   const handleGoogleLogin = async () => {
     if (googleLoading) return;
     setGoogleLoading(true);
+    
+    // Explicitly determine redirect URL to prevent localhost issues in production
+    const redirectUrl = process.env.NODE_ENV === "production"
+      ? "https://eval-mind-ai.vercel.app/auth/callback"
+      : "http://localhost:3000/auth/callback";
+
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: redirectUrl,
       },
     });
   };
