@@ -5,3 +5,17 @@ node_modules
 __pycache__
 *.pyc
 *.log
+
+# Next.js
+.next
+out
+
+# TypeScript
+*.tsbuildinfo
+
+# Logs
+*.log
+ts_errors.txt
+
+# Scratch / temp
+scratch/
