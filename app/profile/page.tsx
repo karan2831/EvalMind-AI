@@ -15,11 +15,12 @@ export default function ProfilePage() {
     async function fetchUser() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
+        setLoading(false);
         router.push('/login');
       } else {
         setUser(session.user);
+        setLoading(false);
       }
-      setLoading(false);
     }
     fetchUser();
   }, [router]);

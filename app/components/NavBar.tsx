@@ -8,17 +8,31 @@ import { usePathname } from 'next/navigation';
 
 export default function NavBar() {
   const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(false);
   const pathname = usePathname();
 
   useEffect(() => {
     const fetchUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user || null);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setUser(session?.user || null);
+      } catch (err) {
+        console.error("Session fetch error:", err);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchUser();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("Auth event:", event);
+      if (event === 'SIGNED_IN' && !user) {
+        setShowWelcome(true);
+        setTimeout(() => setShowWelcome(false), 4000);
+      }
       setUser(session?.user || null);
+      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
@@ -54,7 +68,7 @@ export default function NavBar() {
             <Link href="/evaluate" className={`px-5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-200 ${isActive('/evaluate') ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-900'}`}>
               Evaluate
             </Link>
-            {user && (
+            {!loading && user && (
               <>
                 <Link href="/history" className={`px-5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-200 ${isActive('/history') ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-900'}`}>
                   History
@@ -68,7 +82,9 @@ export default function NavBar() {
           
           {/* Right: Auth / Profile */}
           <div className="flex items-center">
-            {user ? (
+            {loading ? (
+              <div className="w-10 h-10 rounded-full bg-gray-50 animate-pulse border border-gray-100"></div>
+            ) : user ? (
               <Link href="/profile" className="w-10 h-10 rounded-full overflow-hidden border border-gray-200 hover:shadow-md transition-all duration-200 active:scale-90 hover:border-blue-200">
                 <img alt="User Profile" className="w-full h-full object-cover" src={`https://ui-avatars.com/api/?name=${user.user_metadata?.full_name || 'User'}&background=2563eb&color=fff`} />
               </Link>
@@ -87,7 +103,7 @@ export default function NavBar() {
           <span className="material-symbols-outlined" style={isActive('/evaluate') ? { fontVariationSettings: "'FILL' 1" } : {}}>analytics</span>
           <span className="text-[10px] font-medium mt-1">Evaluate</span>
         </Link>
-        {user && (
+        {!loading && user && (
           <>
             <Link href="/history" className={`flex flex-col items-center justify-center ${isActive('/history') ? 'text-[#007aff]' : 'text-gray-600 hover:text-[#1d1d1f]'} px-5 py-1.5 tap-highlight-none active:scale-90 duration-200`}>
               <span className="material-symbols-outlined" style={isActive('/history') ? { fontVariationSettings: "'FILL' 1" } : {}}>history</span>
@@ -100,6 +116,21 @@ export default function NavBar() {
           </>
         )}
       </nav>
+
+      {/* Welcome Toast */}
+      {showWelcome && user && (
+        <div className="fixed top-20 right-6 z-[60] animate-in slide-in-from-right-10 fade-in duration-500">
+          <div className="bg-white border border-blue-100 shadow-2xl shadow-blue-600/10 rounded-2xl p-4 flex items-center gap-4 pr-8">
+            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+              <span className="material-symbols-outlined text-white">waving_hand</span>
+            </div>
+            <div>
+              <p className="text-sm font-bold text-gray-900">Welcome back!</p>
+              <p className="text-xs text-gray-500 font-medium">Ready for another precision evaluation?</p>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

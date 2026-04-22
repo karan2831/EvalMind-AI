@@ -4,6 +4,7 @@ import NavBar from '@/app/components/NavBar';
 import { supabase } from '@/lib/supabaseClient';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import Footer from '@/app/components/Footer';
 
 export default function HistoryPage() {
@@ -15,10 +16,13 @@ export default function HistoryPage() {
   useEffect(() => {
     async function fetchHistory() {
       const { data: { session } } = await supabase.auth.getSession();
+      
       if (!session) {
+        setLoading(false);
         router.push('/login');
         return;
       }
+      
       setSessionUser(session.user);
 
       const { data, error } = await supabase
@@ -31,7 +35,7 @@ export default function HistoryPage() {
       setLoading(false);
     }
     fetchHistory();
-  }, []);
+  }, [router]);
 
   return (
     <div className="font-body text-[#1d1d1f] antialiased min-h-screen">
