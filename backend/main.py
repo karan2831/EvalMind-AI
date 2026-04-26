@@ -7,6 +7,10 @@ import re
 import time
 import fitz # PyMuPDF
 import logging
+from dotenv import load_dotenv
+from ai_evaluator import get_evaluation_ai, get_improvement_ai
+
+load_dotenv()
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO)
@@ -102,6 +106,7 @@ class EvaluationResponse(BaseModel):
     result_label: str
     improvement_plan: str
     learning_outcome: str
+    improved_answer: Optional[str] = None
     validation_confidence: float = 1.0
     extracted_text_preview: Optional[str] = None
 
@@ -313,75 +318,119 @@ async def evaluate_pdf(
         logger.error(f"Internal Error: {str(e)}")
         raise HTTPException(status_code=500, detail="Something went wrong. Please try again.")
 
+@app.post("/ai")
+async def ai_handler(request: dict):
+    question = request.get("question")
+    answer = request.get("answer")
+    marks = request.get("marks", 5)
+    mode = request.get("mode", "evaluate") # "evaluate" or "improve"
+
+    if mode == "evaluate":
+        try:
+            # Determine subject
+            subject = "theory"
+            if any(term in question.lower() for term in ["code", "program", "function", "java", "python", "script"]):
+                subject = "coding"
+            elif any(term in question.lower() for term in ["calculate", "solve", "math", "numerical", "find"]):
+                subject = "numerical"
+                
+            ai_result = await get_evaluation_ai(question, answer, marks, subject)
+            
+            # Post-process for consistency
+            cov_raw = ai_result.get("coverage_score", 50)
+            dep_raw = ai_result.get("depth_score", 50)
+            cla_raw = ai_result.get("clarity_score", 50)
+            final_score = round(((cov_raw * 0.5) + (dep_raw * 0.3) + (cla_raw * 0.2)) / 100 * marks)
+            
+            return {
+                "score": final_score,
+                "coverage_score": cov_raw,
+                "depth_score": dep_raw,
+                "clarity_score": cla_raw,
+                "feedback": ai_result.get("feedback", ""),
+                "missing_points": ai_result.get("missing_points", []),
+                "model_answer": ai_result.get("model_answer", "")
+            }
+        except Exception as e:
+            logger.error(f"Evaluation Error: {str(e)}")
+            raise HTTPException(status_code=500, detail="AI Evaluation failed.")
+
+    elif mode == "improve":
+        try:
+            ai_result = await get_improvement_ai(question, answer)
+            return {"improved_answer": ai_result.get("improved_answer", "No improvement generated.")}
+        except Exception as e:
+            logger.error(f"Improvement Error: {str(e)}")
+            raise HTTPException(status_code=500, detail="AI Improvement failed.")
+
+    else:
+        raise HTTPException(status_code=400, detail="Invalid mode. Choose 'evaluate' or 'improve'.")
+
 @app.post("/evaluate", response_model=EvaluationResponse, dependencies=[Depends(check_rate_limit)])
 async def evaluate_answer(request: EvaluationRequest):
     try:
-        ideal, key_points, exp_map = generate_ideal_answer(request.question, request.marks)
+        # Determine subject
+        subject = "theory"
+        if any(term in request.question.lower() for term in ["code", "program", "function", "java", "python", "script"]):
+            subject = "coding"
+        elif any(term in request.question.lower() for term in ["calculate", "solve", "math", "numerical", "find"]):
+            subject = "numerical"
+            
+        ai_result = await get_evaluation_ai(request.question, request.answer, request.marks, subject)
         
-        # Step 1: Intelligent Input Quality Validation
-        quality_state, val_confidence, reason = validate_input_quality(request.answer, request.question, request.marks, key_points)
+        # Calculate scores
+        cov_raw = ai_result.get("coverage_score", 50)
+        dep_raw = ai_result.get("depth_score", 50)
+        cla_raw = ai_result.get("clarity_score", 50)
+        final_score = round(((cov_raw * 0.5) + (dep_raw * 0.3) + (cla_raw * 0.2)) / 100 * request.marks)
         
-        if quality_state == "garbage":
-            return EvaluationResponse(
-                score=0, max_score=request.marks,
-                breakdown=[BreakdownItem(concept=c, score="0%") for c in ["Coverage", "Depth", "Clarity"]],
-                scoring_breakdown=ScoreBreakdown(coverage=0, depth=0, clarity=0),
-                confidence=0.0, missing_points=[], ideal_answer=ideal,
-                detected_level="Invalid", feedback="Validation Failed",
-                feedback_simple="This answer is not relevant or meaningful for the question. Please provide a proper response.",
-                mistake_explanations=[f"Reason: {reason}"],
-                summary="Invalid Response", result_label="Invalid Response",
-                improvement_plan="Focus on writing a coherent answer with relevant keywords.",
-                learning_outcome="Quality is as important as quantity.",
-                validation_confidence=val_confidence,
-                extracted_text_preview=request.answer[:300]
-            )
-
-        # Step 2: Standard Evaluation
-        cov, depth, clarity, missing, det_lvl = calculate_metrics(request.answer, key_points, request.marks)
+        # Map to UI model
+        cov = cov_raw / 100
+        depth = dep_raw / 100
+        clarity = cla_raw / 100
+        
+        breakdown = [
+            BreakdownItem(concept="Coverage", score=f"{int(cov*100)}%"),
+            BreakdownItem(concept="Depth", score=f"{int(depth*100)}%"),
+            BreakdownItem(concept="Clarity", score=f"{int(clarity*100)}%")
+        ]
         
         scoring = ScoreBreakdown(coverage=cov, depth=depth, clarity=clarity)
-        confidence = (cov * 0.6 + clarity * 0.4)
-        raw_score = (cov * 0.5 + depth * 0.3 + clarity * 0.2) * request.marks
-        final_score = min(max(1, int(round(raw_score))), request.marks)
-
-        # Step 3: Result Labeling
-        percentage = (final_score / request.marks) * 100
-        if quality_state == "low_quality":
-            result_label = "Low Quality Answer"
-            summary = "Answer is too concise."
-            feedback_simple = "Your answer is very short but relevant. Try adding more explanation to get better marks."
-            final_score = min(final_score, max(1, request.marks // 4)) # Cap score for low quality but allow partial marks
-        elif percentage >= 85:
+        
+        percentage = (final_score / request.marks) * 100 if request.marks > 0 else 0
+        if percentage >= 85:
             result_label = "Excellent Answer"
             summary = "Your answer is well-structured and complete."
-            feedback_simple = "Excellent work! Your answer covers all key aspects."
         elif percentage >= 50:
             result_label = "Good Answer"
             summary = "Your answer is good but could be more detailed."
-            feedback_simple = "Nice attempt! You've covered the basics. Try to go deeper into the mechanics."
         else:
             result_label = "Needs Improvement"
             summary = "Your answer needs more detail."
-            feedback_simple = "You missed some key points. Focus on explaining the 'why' behind each concept."
-
-        improvement_plan = "Try to explain the 'why' behind each point." if percentage < 85 else "You've mastered this topic!"
-        mistakes = [exp_map.get(m, f"You missed {m}.") for m in missing[:3]]
-        breakdown = [BreakdownItem(concept=c, score=f"{int(s*100)}%") for c, s in zip(["Coverage", "Depth", "Clarity"], [cov, depth, clarity])]
 
         return EvaluationResponse(
-            score=final_score, max_score=request.marks, breakdown=breakdown, scoring_breakdown=scoring,
-            confidence=round(confidence, 2), missing_points=missing[:3], ideal_answer=ideal,
-            detected_level=det_lvl, feedback="Evaluation Complete",
-            feedback_simple=feedback_simple, mistake_explanations=mistakes, 
-            summary=summary, result_label=result_label, improvement_plan=improvement_plan,
-            learning_outcome="You're getting better!", 
-            validation_confidence=val_confidence,
+            score=final_score,
+            max_score=request.marks,
+            breakdown=breakdown,
+            scoring_breakdown=scoring,
+            confidence=round((cov + clarity) / 2, 2),
+            missing_points=ai_result.get("missing_points", [])[:3],
+            ideal_answer=ai_result.get("model_answer", "No ideal answer provided."),
+            detected_level=f"{request.marks}-mark level",
+            feedback="AI Evaluation Complete",
+            feedback_simple=ai_result.get("feedback", "No feedback provided."),
+            mistake_explanations=[f"Focus on: {p}" for p in ai_result.get("missing_points", [])[:3]],
+            summary=summary,
+            result_label=result_label,
+            improvement_plan="Review the missing points and the improved answer for reference.",
+            learning_outcome="Keep practicing to refine your explanations!",
+            improved_answer=None, # Separate step now
+            validation_confidence=1.0,
             extracted_text_preview=request.answer[:300]
         )
     except Exception as e:
         logger.error(f"Evaluation Error: {str(e)}")
-        raise HTTPException(status_code=500, detail="Something went wrong.")
+        raise HTTPException(status_code=500, detail=f"Something went wrong during AI evaluation: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
