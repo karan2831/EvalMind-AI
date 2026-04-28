@@ -1,21 +1,23 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
+    const cookieStore = await cookies();
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
           getAll() {
-            return request.cookies.getAll();
+            return cookieStore.getAll();
           },
           setAll(cookiesToSet) {
             try {
               cookiesToSet.forEach(({ name, value, options }) =>
-                request.cookies.set(name, value, options)
+                cookieStore.set(name, value, options)
               );
             } catch {}
           },
@@ -23,7 +25,7 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    console.log('[DEBUG] [VERIFY_PAYMENT] All Cookies:', request.cookies.getAll());
+    console.log('[DEBUG] [VERIFY_PAYMENT] All Cookies:', cookieStore.getAll());
 
     const { data: { user }, error } = await supabase.auth.getUser();
 
@@ -66,6 +68,14 @@ export async function POST(request: NextRequest) {
     if (expectedSignature !== razorpay_signature) {
       console.error('[SECURITY_ALERT] Signature mismatch');
       return NextResponse.json({ success: false, error: "Invalid signature" }, { status: 400 });
+    }
+
+    if (!process.env.NEXT_PUBLIC_BACKEND_URL) {
+      console.error("[CRITICAL] BACKEND URL NOT SET");
+      return NextResponse.json(
+        { error: "Backend URL not configured" },
+        { status: 500 }
+      );
     }
 
     // Call backend to update status securely

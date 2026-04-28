@@ -1,10 +1,19 @@
 import os
 import json
-import google.generativeai as genai
+from google import genai
 from typing import Dict, Any
+from dotenv import load_dotenv
 
-# Configure Gemini API
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+# Load environment variables from .env file
+load_dotenv()
+
+# Configure Gemini API Client
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+
+if not GEMINI_API_KEY:
+    raise ValueError("GEMINI_API_KEY not found in environment variables")
+
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 # Safe fallback — returned when AI fails or returns invalid data
 EVALUATION_FALLBACK = {
@@ -54,8 +63,6 @@ async def get_evaluation_ai(question: str, answer: str, marks: int = 5, subject:
     Always returns a valid result — never raises to the caller.
     """
     try:
-        model = genai.GenerativeModel('gemini-pro')
-
         prompt = f"""
 You are a strict academic evaluator. Evaluate the student's answer using exam-level standards.
 
@@ -121,7 +128,10 @@ If unable, return {{}}.
 }}
 """
 
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model='gemini-1.5-flash',
+            contents=prompt
+        )
         result = _parse_json_response(response.text)
 
         # Validate required fields; fall back if missing
@@ -143,8 +153,6 @@ async def get_improvement_ai(question: str, answer: str) -> Dict[str, Any]:
     Always returns a valid result — never raises to the caller.
     """
     try:
-        model = genai.GenerativeModel('gemini-pro')
-
         prompt = f"""
 You are an expert teacher.
 
@@ -168,7 +176,10 @@ Return strictly valid JSON only.
 }}
 """
 
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model='gemini-1.5-flash',
+            contents=prompt
+        )
         result = _parse_json_response(response.text)
 
         if not result or "improved_answer" not in result:

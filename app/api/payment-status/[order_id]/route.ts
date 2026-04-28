@@ -61,7 +61,11 @@ export async function GET(
         console.log(`[RECONCILIATION] Webhook missed for order ${order_id}. Delegating to backend.`);
         
         // Call FastAPI internal endpoint
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:10000';
+        if (!process.env.NEXT_PUBLIC_BACKEND_URL) {
+          console.error("[CRITICAL] BACKEND URL NOT SET");
+          return NextResponse.json({ error: "Backend URL not configured" }, { status: 500 });
+        }
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
         const response = await fetch(`${backendUrl}/internal/reconcile`, {
           method: 'POST',
           headers: {

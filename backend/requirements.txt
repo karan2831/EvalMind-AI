@@ -5,5 +5,5 @@ python-dotenv
 pydantic
 pymupdf
 python-multipart
-google-generativeai
+google-genai
 supabase

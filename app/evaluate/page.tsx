@@ -104,7 +104,10 @@ export default function EvaluatePage() {
         setPrevScore(result?.score);
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      if (!process.env.NEXT_PUBLIC_BACKEND_URL) {
+        throw new Error("Backend URL not configured");
+      }
+      const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
@@ -159,7 +162,10 @@ export default function EvaluatePage() {
     if (!result || hasImproved || isImproving) return;
     setIsImproving(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/ai`, {
+      if (!process.env.NEXT_PUBLIC_BACKEND_URL) {
+        throw new Error("Backend URL not configured");
+      }
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/ai`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

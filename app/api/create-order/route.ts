@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import Razorpay from 'razorpay';
 import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 
 export async function GET() {
   return NextResponse.json({ test: "working" });
@@ -9,6 +10,7 @@ export async function GET() {
 export async function POST(request: Request) {
   console.log("[CREATE_ORDER] POST HIT");
   
+  const cookieStore = await cookies();
   console.log("[DEBUG] Backend Razorpay Key:", process.env.RAZORPAY_KEY_ID);
 
   if (!process.env.RAZORPAY_KEY_ID?.startsWith("rzp_live_")) {
@@ -28,12 +30,12 @@ export async function POST(request: Request) {
       {
         cookies: {
           getAll() {
-            return request.cookies.getAll();
+            return cookieStore.getAll();
           },
           setAll(cookiesToSet) {
             try {
               cookiesToSet.forEach(({ name, value, options }) =>
-                request.cookies.set(name, value, options)
+                cookieStore.set(name, value, options)
               );
             } catch {
               // Ignore in server environment
@@ -43,7 +45,7 @@ export async function POST(request: Request) {
       }
     );
 
-    console.log('[DEBUG] [CREATE_ORDER] All Cookies:', request.cookies.getAll());
+    console.log('[DEBUG] [CREATE_ORDER] All Cookies:', cookieStore.getAll());
 
     const { data: { user }, error } = await supabase.auth.getUser();
 
