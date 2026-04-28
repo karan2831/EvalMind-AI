@@ -1,9 +1,11 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request, Depends
+import asyncio
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, validator
 from typing import List, Optional, Dict
 import os
 import re
+import requests
 import time
 import fitz # PyMuPDF
 import logging
@@ -153,6 +155,75 @@ class CreateOrderRequest(BaseModel):
 class VerifyPaymentRequest(BaseModel):
     order_id: str
     payment_id: str
+
+class ProfileUpdate(BaseModel):
+    full_name: str
+    avatar: str
+
+# --- Support Route (Direct) ---
+class SupportRequest(BaseModel):
+    subject: str
+    description: str
+    user_email: str | None = None
+
+@app.post("/support/create")
+async def create_support(data: SupportRequest):
+    try:
+        logger.info(f"[SUPPORT] Incoming request: {data}")
+
+        if not supabase_admin:
+            logger.error("[SUPPORT] Supabase not initialized")
+
+        # DB insert
+        try:
+            def insert_s():
+                return supabase_admin.table("support_requests").insert({
+                    "user_id": None,
+                    "subject": data.subject,
+                    "description": data.description,
+                    "user_email": data.user_email,
+                    "status": "pending"
+                }).execute()
+
+            if supabase_admin:
+                await asyncio.to_thread(insert_s)
+                logger.info("[SUPPORT] Saved to DB")
+        except Exception as db_e:
+            logger.error(f"[SUPPORT] DB error: {db_e}")
+
+        # Email
+        RESEND_API_KEY = os.getenv("RESEND_API_KEY")
+
+        if not RESEND_API_KEY:
+            logger.warning("[SUPPORT] RESEND_API_KEY missing")
+
+        if RESEND_API_KEY:
+            headers = {
+                "Authorization": f"Bearer {RESEND_API_KEY}",
+                "Content-Type": "application/json"
+            }
+
+            try:
+                res = requests.post(
+                    "https://api.resend.com/emails",
+                    headers=headers,
+                    json={
+                        "from": "EvalMind <onboarding@resend.dev>",
+                        "to": [os.getenv("ADMIN_EMAIL")],
+                        "subject": f"New Support: {data.subject}",
+                        "html": f"<p>{data.description}</p>"
+                    },
+                    timeout=5
+                )
+                logger.info(f"[SUPPORT] Email sent: {res.status_code}")
+            except Exception as e:
+                logger.error(f"[SUPPORT] Email error: {e}")
+
+        return {"success": True}
+
+    except Exception as e:
+        logger.error(f"[SUPPORT] Crash: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ==========================================
 # PART 4: DYNAMIC KNOWLEDGE ENGINE
@@ -475,6 +546,53 @@ async def evaluate_answer(request: EvaluationRequest):
     except Exception as e:
         logger.error(f"Evaluation Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Something went wrong during AI evaluation: {str(e)}")
+
+# ==========================================
+# PART 5.5: PROFILE & SUPPORT
+# ==========================================
+@app.get("/profile/{user_id}", dependencies=[Depends(check_rate_limit)])
+async def get_profile(user_id: str):
+    if not supabase_admin:
+        raise HTTPException(status_code=500, detail="Supabase not initialized")
+    
+    try:
+        def fetch_p():
+            return supabase_admin.table("profiles").select("*").eq("id", user_id).execute()
+        
+        res = await asyncio.to_thread(fetch_p)
+        if not res.data:
+            return {"full_name": "", "avatar": "avatar1"}
+        return res.data[0]
+    except Exception as e:
+        logger.error(f"Error fetching profile: {str(e)}")
+        return {"full_name": "", "avatar": "avatar1"}
+
+@app.post("/profile/update", dependencies=[Depends(check_rate_limit)])
+async def update_profile(req: ProfileUpdate, request: Request):
+    auth_header = await verify_token(request)
+    token = auth_header.split(" ")[1]
+    
+    try:
+        # Verify user with token
+        user_res = supabase_admin.auth.get_user(token)
+        if not user_res or not user_res.user:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        
+        user_id = user_res.user.id
+        
+        def upsert_p():
+            return supabase_admin.table("profiles").upsert({
+                "id": user_id,
+                "full_name": req.full_name,
+                "avatar": req.avatar,
+                "updated_at": "now()"
+            }).execute()
+        
+        await asyncio.to_thread(upsert_p)
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"Profile update error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update profile")
 
 # ==========================================
 # PART 6: RAZORPAY WEBHOOK & RECONCILIATION

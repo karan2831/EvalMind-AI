@@ -5,22 +5,34 @@ import { supabase } from '@/lib/supabaseClient';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Footer from '@/app/components/Footer';
+import { PageSkeleton } from '@/app/components/skeletons/PageSkeleton';
+import ProfileForm from '@/app/components/profile/ProfileForm';
+import SupportForm from '@/app/components/support/SupportForm';
 
 export default function ProfilePage() {
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'profile' | 'support'>('profile');
   const router = useRouter();
 
   const fetchProfile = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    if (!error && data) {
-      setProfile(data);
-      return data;
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      if (!error && data) {
+        setProfile(data);
+        return data;
+      }
+    } catch (err) {
+      console.error("Profile fetch error:", err);
+    } finally {
+      setProfileLoading(false);
     }
     return null;
   };
@@ -28,22 +40,39 @@ export default function ProfilePage() {
   useEffect(() => {
     let mounted = true;
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (mounted) {
+        if (session) {
+          setUser(session.user);
+          setLoading(false);
+          fetchProfile(session.user.id);
+        } else {
+          router.push('/login');
+        }
+      }
+    };
+
+    checkSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
 
-      if (!session) {
-        setLoading(false);
+      if (event === 'SIGNED_OUT') {
         router.push('/login');
-      } else {
+        return;
+      }
+
+      if (session) {
         setUser(session.user);
-        await fetchProfile(session.user.id);
         setLoading(false);
+        fetchProfile(session.user.id);
       }
     });
 
     return () => {
       mounted = false;
-      authListener.subscription.unsubscribe();
+      subscription.unsubscribe();
     };
   }, [router]);
 
@@ -204,36 +233,64 @@ export default function ProfilePage() {
     }
   };
 
-  if (loading || !user) return (
-    <div className="min-h-screen bg-[#f5f5f7] flex items-center justify-center">
-      <span className="material-symbols-outlined animate-spin text-[#007aff] text-4xl">sync</span>
+  if (loading && !user) return (
+    <div className="min-h-screen bg-[#f5f5f7]">
+      <NavBar />
+      <PageSkeleton type="profile" />
     </div>
   );
 
   return (
-    <div className="font-body text-[#1d1d1f] antialiased min-h-screen">
+    <div className="font-body text-[#1d1d1f] antialiased min-h-screen transition-opacity duration-300 opacity-100">
       <NavBar />
       <main className="max-w-3xl mx-auto px-6 pt-32 pb-24 space-y-12 z-10 relative">
         {/* Profile Header */}
         <section className="flex flex-col items-center text-center space-y-4">
           <div className="relative">
-            <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-white shadow-md bg-white">
-              <img alt="User Avatar" className="w-full h-full object-cover" src={`https://ui-avatars.com/api/?name=${user.user_metadata?.full_name || 'User'}&background=007aff&color=fff&size=150`} />
+            <div className={`w-24 h-24 rounded-full overflow-hidden border-2 border-white shadow-md bg-white flex items-center justify-center ${profileLoading ? 'animate-pulse' : ''}`}>
+              {profileLoading ? (
+                <div className="w-full h-full bg-gray-200" />
+              ) : profile?.avatar && ['smile', 'cat', 'dog', 'octopus', 'lion', 'bot', 'ghost', 'sparkles'].includes(profile.avatar) ? (
+                <span className="text-5xl select-none">
+                  {profile.avatar === 'smile' ? '😀' : 
+                   profile.avatar === 'cat' ? '😺' : 
+                   profile.avatar === 'dog' ? '🐶' : 
+                   profile.avatar === 'octopus' ? '🐙' : 
+                   profile.avatar === 'lion' ? '🦁' : 
+                   profile.avatar === 'bot' ? '🤖' : 
+                   profile.avatar === 'ghost' ? '👻' : '✨'}
+                </span>
+              ) : (
+                <img 
+                  alt="User Avatar" 
+                  className="w-full h-full object-cover" 
+                  src={profile?.avatar && profile.avatar.startsWith('avatar')
+                    ? `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.avatar === 'avatar1' ? 'Felix' : profile.avatar === 'avatar2' ? 'Aneka' : profile.avatar === 'avatar3' ? 'Buddy' : profile.avatar === 'avatar4' ? 'Cookie' : profile.avatar === 'avatar5' ? 'Daisy' : 'Elvis'}`
+                    : `https://ui-avatars.com/api/?name=${profile?.full_name || user.user_metadata?.full_name || 'User'}&background=007aff&color=fff&size=150`
+                  } 
+                />
+              )}
             </div>
-            <button className="absolute bottom-0 right-0 w-8 h-8 bg-white border border-[#d2d2d7] rounded-full shadow-sm flex items-center justify-center text-[#1d1d1f] hover:bg-[#f5f5f7] transition-colors">
-              <span className="material-symbols-outlined text-[16px]">edit</span>
-            </button>
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-[#1d1d1f]">{user.user_metadata?.full_name || 'User'}</h1>
-            <div className="flex items-center justify-center gap-2 mt-1">
-              <p className="text-[#86868b] text-sm">{user.email}</p>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${profile?.tier === 'premium' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-gray-100 text-gray-500 border border-gray-200'}`}>
-                {profile?.tier || 'Free'} Plan
-              </span>
-            </div>
+            {profileLoading ? (
+              <div className="space-y-2 flex flex-col items-center">
+                <div className="h-7 w-48 bg-gray-200 rounded-lg animate-pulse" />
+                <div className="h-4 w-64 bg-gray-100 rounded-lg animate-pulse" />
+              </div>
+            ) : (
+              <>
+                <h1 className="text-2xl font-bold tracking-tight text-[#1d1d1f]">{profile?.full_name || user.user_metadata?.full_name || 'User'}</h1>
+                <div className="flex items-center justify-center gap-2 mt-1">
+                  <p className="text-[#86868b] text-sm">{user.email}</p>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${profile?.tier === 'premium' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-gray-100 text-gray-500 border border-gray-200'}`}>
+                    {profile?.tier || 'Free'} Plan
+                  </span>
+                </div>
+              </>
+            )}
             
-            {profile?.tier !== 'premium' && (
+            {profile?.tier !== 'premium' && !profileLoading && (
               <button
                 onClick={handleUpgrade}
                 className="mt-6 bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-blue-700 transition-all active:scale-[0.98] shadow-lg shadow-blue-600/20 flex items-center gap-2 mx-auto"
@@ -245,49 +302,26 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        {/* Profile Sections */}
-        <section className="space-y-6">
-          <div className="bg-white border border-gray-100 shadow-sm rounded-2xl overflow-hidden">
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[18px]">person</span>
-                </div>
-                <span className="font-semibold text-sm">Personal Info</span>
-              </div>
-              <span className="material-symbols-outlined text-gray-400 text-sm">arrow_forward_ios</span>
-            </div>
-            
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-green-50 text-green-600 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[18px]">security</span>
-                </div>
-                <span className="font-semibold text-sm">Security & Password</span>
-              </div>
-              <span className="material-symbols-outlined text-gray-400 text-sm">arrow_forward_ios</span>
-            </div>
-            
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[18px]">settings</span>
-                </div>
-                <span className="font-semibold text-sm">Preferences</span>
-              </div>
-              <span className="material-symbols-outlined text-gray-400 text-sm">arrow_forward_ios</span>
-            </div>
+        {/* Tabs */}
+        <div className="flex bg-gray-100 p-1 rounded-2xl gap-1">
+          <button 
+            onClick={() => setActiveTab('profile')}
+            className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'profile' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+          >
+            Personal Info
+          </button>
+          <button 
+            onClick={() => setActiveTab('support')}
+            className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'support' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+          >
+            Support
+          </button>
+        </div>
 
-            <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[18px]">help</span>
-                </div>
-                <span className="font-semibold text-sm">Support</span>
-              </div>
-              <span className="material-symbols-outlined text-gray-400 text-sm">arrow_forward_ios</span>
-            </div>
-          </div>
+        {/* Dynamic Section */}
+        <section className="space-y-6">
+          {activeTab === 'profile' && <ProfileForm />}
+          {activeTab === 'support' && <SupportForm />}
 
           <div className="pt-6">
             <button 

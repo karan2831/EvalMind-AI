@@ -4,9 +4,19 @@ import NavBar from '@/app/components/NavBar';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import Footer from '@/app/components/Footer';
+import { useState, useEffect } from 'react';
+import { CardSkeleton } from '@/app/components/skeletons/CardSkeleton';
 
 export default function LandingPage() {
   const router = useRouter();
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, []);
 
   const features = [
     {
@@ -50,7 +60,8 @@ export default function LandingPage() {
                   alt="EvalMind AI" 
                   width={140}
                   height={140}
-                  className="object-cover rounded-xl w-full h-full"
+                  className="object-cover rounded-xl"
+                  style={{ width: "100%", height: "auto" }}
                   priority
                 />
               </div>
@@ -167,15 +178,23 @@ export default function LandingPage() {
           </div>
           
           <div className="grid md:grid-cols-3 gap-8">
-            {features.map((f, i) => (
-              <div key={i} className="group bg-white border border-gray-100 shadow-sm rounded-2xl p-8 hover:shadow-xl hover:shadow-gray-200/50 hover:border-gray-200 hover:-translate-y-1 transition-all duration-300">
-                <div className={`w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110 mb-8`}>
-                  <span className={`material-symbols-outlined text-2xl ${f.color === 'blue' ? 'text-blue-600' : f.color === 'green' ? 'text-green-600' : 'text-red-600'}`} style={{ fontVariationSettings: "'FILL' 1" }}>{f.icon}</span>
+            {loading ? (
+              <>
+                <CardSkeleton />
+                <CardSkeleton />
+                <CardSkeleton />
+              </>
+            ) : (
+              features.map((f, i) => (
+                <div key={i} className="group bg-white border border-gray-100 shadow-sm rounded-2xl p-8 hover:shadow-xl hover:shadow-gray-200/50 hover:border-gray-200 hover:-translate-y-1 transition-all duration-300">
+                  <div className={`w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110 mb-8`}>
+                    <span className={`material-symbols-outlined text-2xl ${f.color === 'blue' ? 'text-blue-600' : f.color === 'green' ? 'text-green-600' : 'text-red-600'}`} style={{ fontVariationSettings: "'FILL' 1" }}>{f.icon}</span>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-3">{f.title}</h3>
+                  <p className="text-gray-500 text-sm leading-loose font-medium">{f.desc}</p>
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-3">{f.title}</h3>
-                <p className="text-gray-500 text-sm leading-loose font-medium">{f.desc}</p>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </section>

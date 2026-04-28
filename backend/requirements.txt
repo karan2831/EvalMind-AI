@@ -7,3 +7,4 @@ pymupdf
 python-multipart
 google-genai
 supabase
+requests

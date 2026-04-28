@@ -4,22 +4,34 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 export default function NavBar() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showWelcome, setShowWelcome] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
 
   useEffect(() => {
     let mounted = true;
 
     const loadInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (mounted) {
-        setUser(session?.user || null);
-        setLoading(false);
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        
+        if (mounted) {
+          setUser(session?.user || null);
+          setLoading(false);
+        }
+      } catch (err: any) {
+        console.error("Session load error:", err);
+        if (err.message?.includes("Refresh Token") || err.status === 400) {
+          await supabase.auth.signOut();
+          router.push("/login");
+        }
+        if (mounted) setLoading(false);
       }
     };
 
@@ -39,9 +51,14 @@ export default function NavBar() {
 
     const handlePaymentSuccess = async () => {
       console.log("[EVENT] Payment success detected, refreshing UI");
-      const { data: { session } } = await supabase.auth.getSession();
-      if (mounted) {
-        setUser(session?.user || null);
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        if (mounted) {
+          setUser(session?.user || null);
+        }
+      } catch (err) {
+        console.error("Payment refresh error:", err);
       }
     };
 
@@ -70,6 +87,7 @@ export default function NavBar() {
                   alt="EvalMind AI Logo" 
                   width={32}
                   height={32}
+                  style={{ width: "auto", height: "auto" }}
                   className="object-cover rounded-md"
                   priority
                 />

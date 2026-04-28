@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Footer from '@/app/components/Footer';
+import { PageSkeleton } from '@/app/components/skeletons/PageSkeleton';
 
 export default function HistoryPage() {
   const [history, setHistory] = useState<any[]>([]);
@@ -14,27 +15,43 @@ export default function HistoryPage() {
   const router = useRouter();
 
   useEffect(() => {
+    let mounted = true;
     async function fetchHistory() {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        setLoading(false);
-        router.push('/login');
-        return;
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        
+        if (!session) {
+          if (mounted) setLoading(false);
+          router.push('/login');
+          return;
+        }
+        
+        setSessionUser(session.user);
+
+        const { data, error: historyError } = await supabase
+          .from('evaluation_history')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .order('created_at', { ascending: false });
+
+        if (historyError) throw historyError;
+        if (data && mounted) setHistory(data);
+        
+        setTimeout(() => {
+          if (mounted) setLoading(false);
+        }, 500);
+      } catch (err: any) {
+        console.error("History fetch error:", err);
+        if (err.message?.includes("Refresh Token") || err.status === 400) {
+          await supabase.auth.signOut();
+          router.push('/login');
+        }
+        if (mounted) setLoading(false);
       }
-      
-      setSessionUser(session.user);
-
-      const { data, error } = await supabase
-        .from('evaluation_history')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .order('created_at', { ascending: false });
-
-      if (data) setHistory(data);
-      setLoading(false);
     }
     fetchHistory();
+    return () => { mounted = false; };
   }, [router]);
 
   return (
@@ -58,7 +75,9 @@ export default function HistoryPage() {
         )}
 
         {loading ? (
-          <div className="text-center text-[#86868b] py-20 font-semibold">Loading your history...</div>
+          <div className="transition-opacity duration-300 opacity-100">
+            <PageSkeleton type="dashboard" />
+          </div>
         ) : !sessionUser ? (
           <div className="apple-card p-12 text-center flex flex-col items-center max-w-2xl mx-auto mt-10">
             <div className="w-16 h-16 bg-[#e5e5ea] rounded-full flex items-center justify-center mb-4">

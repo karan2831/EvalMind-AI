@@ -4,6 +4,8 @@ import NavBar from '@/app/components/NavBar';
 import { supabase } from '@/lib/supabaseClient';
 import { useState, useEffect } from 'react';
 import Footer from '@/app/components/Footer';
+import { PageSkeleton } from '@/app/components/skeletons/PageSkeleton';
+import { Upload, Lock } from "lucide-react";
 
 const PREDEFINED_QUESTIONS = [
   "Explain the process of photosynthesis in plants.",
@@ -46,10 +48,60 @@ export default function EvaluatePage() {
   const [isImproving, setIsImproving] = useState(false);
   const [hasImproved, setHasImproved] = useState(false);
 
+  // Access Control States
+  const [usageCount, setUsageCount] = useState(0);
+  const [userPlan, setUserPlan] = useState<'free' | 'premium'>('free');
+
+  const isLoggedIn = !!user;
+  const isPremium = userPlan === 'premium';
+  const isLimitReached = usageCount >= 20;
+
+  const canUseAdvanced = isLoggedIn && (isPremium || !isLimitReached);
+
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user || null);
-    });
+    const checkInitialSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        
+        const currentUser = session?.user || null;
+        setUser(currentUser);
+
+        if (currentUser) {
+          // Fetch Profile for Plan
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('plan')
+            .eq('id', currentUser.id)
+            .single();
+          
+          if (profile) {
+            setUserPlan(profile.plan || 'free');
+            console.log("USER PLAN:", profile.plan || 'free');
+          }
+
+          // Fetch Monthly Usage
+          const startOfMonth = new Date();
+          startOfMonth.setDate(1);
+          startOfMonth.setHours(0, 0, 0, 0);
+
+          const { count } = await supabase
+            .from('evaluation_history')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', currentUser.id)
+            .gte('created_at', startOfMonth.toISOString());
+          
+          setUsageCount(count || 0);
+        }
+      } catch (err: any) {
+        console.error("Initial session check failed:", err);
+        if (err.message?.includes("Refresh Token") || err.status === 400) {
+          await supabase.auth.signOut();
+          window.location.href = "/login";
+        }
+      }
+    };
+    checkInitialSession();
   }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -108,8 +160,32 @@ export default function EvaluatePage() {
         throw new Error("Backend URL not configured");
       }
       const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
+      
+      const checkSession = async () => {
+        try {
+          const { data: { session }, error } = await supabase.auth.getSession();
+          if (error) throw error;
+          
+          if (!session) {
+            router.push('/login');
+            return null;
+          }
+          return session;
+        } catch (err: any) {
+          console.error("Evaluation session error:", err);
+          if (err.message?.includes("Refresh Token") || err.status === 400) {
+            await supabase.auth.signOut();
+            router.push('/login');
+            return null;
+          }
+          throw err;
+        }
+      };
+
+      const session = await checkSession();
+      if (!session) return;
+      
+      const token = session.access_token;
 
       if (inputMode === 'manual') {
         const res = await fetch(`${apiUrl}/evaluate`, {
@@ -136,7 +212,9 @@ export default function EvaluatePage() {
     } catch (err: any) {
       setError(err.message || "Evaluation failed.");
     } finally {
-      setLoading(false);
+      setTimeout(() => {
+        setLoading(false);
+      }, 500);
     }
   };
 
@@ -189,21 +267,84 @@ export default function EvaluatePage() {
       <NavBar />
       <main className="max-w-4xl mx-auto px-6 pt-32 pb-24 space-y-12 z-10 relative">
         <section className="text-center space-y-3">
-          <h1 className="text-4xl font-semibold tracking-tight text-gray-900">Evaluation Dashboard</h1>
+          <div className="flex items-center justify-center gap-3">
+            <h1 className="text-4xl font-semibold tracking-tight text-gray-900">Evaluation Dashboard</h1>
+            {isPremium && (
+              <span className="bg-gradient-to-r from-yellow-400 to-amber-500 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-md shadow-yellow-400/40 animate-pulse shadow-[0_0_12px_rgba(250,204,21,0.6)]">
+                Premium
+              </span>
+            )}
+            {!isPremium && isLoggedIn && (
+              <span className="bg-gray-100 text-gray-500 text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider border border-gray-200">
+                Free
+              </span>
+            )}
+          </div>
           <p className="text-gray-500 font-medium">Precision-engineered academic assessment engine</p>
         </section>
 
         <div className="flex justify-center">
-          <div className="bg-gray-100 p-1 rounded-2xl flex gap-1 border border-gray-200 shadow-sm">
-            {INPUT_MODES.map((mode) => (
-              <button 
-                key={mode.id} 
-                onClick={() => setInputMode(mode.id)} 
-                className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${inputMode === mode.id ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
-              >
-                {mode.label}
-              </button>
-            ))}
+          <div className="bg-gray-100 p-1.5 rounded-2xl flex gap-1.5 border border-gray-200 shadow-sm overflow-x-auto scrollbar-hide">
+            {INPUT_MODES.map((mode) => {
+              const isRestricted = mode.id !== 'manual';
+              const isDisabled = isRestricted && !canUseAdvanced;
+              
+              return (
+                <button 
+                  key={mode.id} 
+                  onClick={() => {
+                    if (isRestricted) {
+                      if (!isLoggedIn) {
+                        alert("Please login to use this feature");
+                        return;
+                      }
+                      if (!isPremium && isLimitReached) {
+                        alert("Monthly limit reached. Upgrade to Premium");
+                        return;
+                      }
+                    }
+                    setInputMode(mode.id);
+                  }} 
+                  className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-all whitespace-nowrap relative ${
+                    inputMode === mode.id 
+                      ? 'bg-white text-blue-600 shadow-md ring-1 ring-black/5' 
+                      : isDisabled 
+                        ? 'text-gray-400 cursor-not-allowed opacity-80' 
+                        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200/50'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[20px]">
+                    {mode.icon}
+                  </span>
+                  {mode.label}
+                  
+                  {isRestricted && (
+                    <div className="flex flex-col items-start ml-2 min-w-[40px]">
+                      {/* TEXT */}
+                      {!isLoggedIn ? (
+                        <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Login</span>
+                      ) : isPremium ? (
+                        null
+                      ) : (
+                        <span className="text-[10px] text-gray-500 font-bold tabular-nums">
+                          {usageCount}/20
+                        </span>
+                      )}
+
+                      {/* MICRO BAR */}
+                      {isLoggedIn && !isPremium && (
+                        <div className="w-10 h-[2px] bg-gray-200 rounded-full mt-0.5 overflow-hidden">
+                          <div
+                            className={`h-full transition-all duration-500 ${isLimitReached ? 'bg-red-500' : 'bg-blue-500'}`}
+                            style={{ width: `${Math.min((usageCount / 20) * 100, 100)}%` }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -233,10 +374,30 @@ export default function EvaluatePage() {
             {inputMode === 'manual' ? (
               <textarea className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm h-40 resize-none" value={userAnswer} onChange={(e) => setUserAnswer(e.target.value)} placeholder="Write your answer here..." />
             ) : (
-              <div className="border-2 border-dashed border-gray-200 rounded-2xl p-8 text-center bg-gray-50">
-                <input type="file" accept=".pdf" onChange={handleFileChange} className="mb-2" />
-                <p className="text-xs text-gray-500">{selectedFile ? selectedFile.name : "Select a PDF file"}</p>
-              </div>
+              <label 
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-2xl cursor-pointer transition-all duration-300 ${isDragging ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 bg-gray-50 hover:bg-gray-100 hover:border-gray-300'}`}
+              >
+                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                  <div className={`p-3 rounded-full mb-3 ${isDragging ? 'bg-blue-100 text-blue-600' : 'bg-white text-gray-400 shadow-sm'}`}>
+                    <Upload className="w-8 h-8" />
+                  </div>
+                  <p className="mb-2 text-sm text-gray-700 font-semibold">
+                    {selectedFile ? "File Selected" : "Click to upload or drag and drop"}
+                  </p>
+                  <p className="text-xs text-gray-500 font-medium">
+                    {selectedFile ? selectedFile.name : "High quality PDF (MAX. 10MB)"}
+                  </p>
+                </div>
+                <input 
+                  type="file" 
+                  accept="application/pdf" 
+                  className="hidden" 
+                  onChange={handleFileChange} 
+                />
+              </label>
             )}
           </div>
 
@@ -249,7 +410,13 @@ export default function EvaluatePage() {
 
         {error && <div className="p-4 bg-red-50 text-red-600 rounded-xl text-sm border border-red-100">{error}</div>}
 
-        {result && (
+        {loading && (
+          <div className="transition-opacity duration-300 opacity-100">
+            <PageSkeleton type="evaluate" />
+          </div>
+        )}
+
+        {result && !loading && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="bg-white border border-gray-100 rounded-2xl p-10 text-center shadow-lg">
               <div className="flex flex-col items-center gap-2">
