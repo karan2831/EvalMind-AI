@@ -8,26 +8,200 @@ import Footer from '@/app/components/Footer';
 
 export default function ProfilePage() {
   const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  const fetchProfile = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    if (!error && data) {
+      setProfile(data);
+      return data;
+    }
+    return null;
+  };
+
   useEffect(() => {
-    async function fetchUser() {
-      const { data: { session } } = await supabase.auth.getSession();
+    let mounted = true;
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+
       if (!session) {
         setLoading(false);
         router.push('/login');
       } else {
         setUser(session.user);
+        await fetchProfile(session.user.id);
         setLoading(false);
       }
-    }
-    fetchUser();
+    });
+
+    return () => {
+      mounted = false;
+      authListener.subscription.unsubscribe();
+    };
   }, [router]);
 
+  useEffect(() => {
+    const handler = () => {
+      if (user) {
+        fetchProfile(user.id);
+      } else {
+        window.location.reload();
+      }
+    };
+
+    window.addEventListener('payment-success', handler);
+    return () => window.removeEventListener('payment-success', handler);
+  }, [user]);
+
+  const loadRazorpay = () => {
+    return new Promise((resolve) => {
+      if ((window as any).Razorpay) return resolve(true);
+
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => resolve(true);
+      document.body.appendChild(script);
+    });
+  };
+
+  const handleUpgrade = async () => {
+    try {
+      await loadRazorpay();
+
+      if (!user) {
+        alert('You must be logged in to upgrade.');
+        router.push('/login');
+        return;
+      }
+
+      const res = await fetch("/api/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: 9900 }),
+      });
+
+      // 🔍 Debug raw response
+      console.log("[DEBUG] RAW RESPONSE:", res);
+
+      // Read raw text first
+      const text = await res.text();
+      console.log("[DEBUG] RAW TEXT:", text);
+
+      // Safe JSON parse
+      let order;
+      try {
+        order = JSON.parse(text);
+      } catch (e) {
+        console.error("[ERROR] JSON parse failed:", e);
+        throw new Error("Invalid JSON response from server");
+      }
+
+      console.log("[DEBUG] PARSED ORDER:", order);
+
+      // Handle API errors properly
+      if (!res.ok) {
+        throw new Error(order?.error || "Order API failed");
+      }
+
+      // Strict validation
+      if (!order || !order.id) {
+        console.error("[ERROR] Order creation failed:", order);
+        throw new Error("Order creation failed - invalid response");
+      }
+
+      console.log("[DEBUG] Opening Razorpay with order:", order.id);
+      
+      console.log("[DEBUG] Razorpay Key:", process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID);
+
+      if (!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID?.startsWith("rzp_live_")) {
+        console.error("[ERROR] Razorpay running in TEST mode");
+      } else {
+        console.log("[SUCCESS] Razorpay running in LIVE mode");
+      }
+
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        amount: order.amount,
+        currency: order.currency,
+        name: 'EvalMind AI',
+        description: 'Upgrade to Pro',
+        order_id: order.id,
+
+        handler: async function (response: any) {
+          const verifyRes = await fetch('/api/verify-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(response),
+            credentials: 'include',
+          });
+
+          const data = await verifyRes.json();
+
+          if (data.success) {
+            console.log("[SUCCESS] Payment verified & UI updated (reactive)");
+            alert("🎉 Payment successful! You are now a Pro user.");
+            
+            // 🔁 Refresh user data
+            if (user) {
+              await fetchProfile(user.id);
+            }
+            window.dispatchEvent(new Event('payment-success'));
+
+            // 🟡 fallback safety (important): only reload if reactivity fails
+            setTimeout(async () => {
+              try {
+                const refreshed = await fetchProfile(user.id);
+
+                if (refreshed?.tier !== "premium") {
+                  console.warn("[FALLBACK] UI not updated, forcing reload");
+                  window.location.reload();
+                }
+              } catch (err) {
+                console.error("[FALLBACK ERROR]", err);
+                window.location.reload();
+              }
+            }, 2000);
+          } else {
+            alert('Verification failed: ' + (data.error || 'Unknown error'));
+          }
+        },
+        theme: {
+          color: '#2563eb',
+        },
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
+
+    } catch (err) {
+      console.error(err);
+      alert('Payment failed');
+    }
+  };
+
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    router.push('/');
+    if (isSigningOut) return;
+
+    setIsSigningOut(true);
+
+    try {
+      await supabase.auth.signOut();
+      router.push('/');
+    } catch (err) {
+      console.warn("[WARNING] SignOut lock issue (safe):", err);
+      router.push('/');
+    } finally {
+      setIsSigningOut(false);
+    }
   };
 
   if (loading || !user) return (
@@ -52,7 +226,22 @@ export default function ProfilePage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-[#1d1d1f]">{user.user_metadata?.full_name || 'User'}</h1>
-            <p className="text-[#86868b] text-sm mt-1">{user.email}</p>
+            <div className="flex items-center justify-center gap-2 mt-1">
+              <p className="text-[#86868b] text-sm">{user.email}</p>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${profile?.tier === 'premium' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-gray-100 text-gray-500 border border-gray-200'}`}>
+                {profile?.tier || 'Free'} Plan
+              </span>
+            </div>
+            
+            {profile?.tier !== 'premium' && (
+              <button
+                onClick={handleUpgrade}
+                className="mt-6 bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-blue-700 transition-all active:scale-[0.98] shadow-lg shadow-blue-600/20 flex items-center gap-2 mx-auto"
+              >
+                <span className="material-symbols-outlined text-[18px]">workspace_premium</span>
+                Upgrade to Pro (₹99)
+              </button>
+            )}
           </div>
         </section>
 

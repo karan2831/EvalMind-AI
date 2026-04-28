@@ -8,15 +8,49 @@ import time
 import fitz # PyMuPDF
 import logging
 from dotenv import load_dotenv
+from supabase import create_client, Client
 from ai_evaluator import get_evaluation_ai, get_improvement_ai
 
 load_dotenv()
 
+# Initialize Supabase Admin Client
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+supabase_admin: Client = None
+if SUPABASE_URL and SUPABASE_KEY:
+    supabase_admin = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+
 # Configure Logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("EvalMindSecurity")
 
 app = FastAPI(title="EvalMind AI Backend")
+
+# ==========================================
+# PART 0: HEALTH & SYSTEM MONITORING
+# ==========================================
+@app.get("/health")
+async def health_check():
+    health_status = {
+        "status": "healthy",
+        "timestamp": time.time(),
+        "services": {
+            "database": "connected" if supabase_admin else "disconnected",
+            "razorpay": "configured" if os.environ.get("RAZORPAY_KEY_ID") and os.environ.get("RAZORPAY_KEY_SECRET") else "missing_keys"
+        }
+    }
+    if not supabase_admin:
+        health_status["status"] = "degraded"
+    return health_status
+
+
+# Global Exception Handler
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"[ERROR] Global Exception on {request.url.path}: {str(exc)}")
+    return {"detail": "An unexpected internal server error occurred."}
+
 
 # ==========================================
 # PART 1: SECURITY - RATE LIMITING
@@ -109,6 +143,16 @@ class EvaluationResponse(BaseModel):
     improved_answer: Optional[str] = None
     validation_confidence: float = 1.0
     extracted_text_preview: Optional[str] = None
+
+class CreateOrderRequest(BaseModel):
+    order_id: str
+    user_id: str
+    amount: int
+    currency: str
+
+class VerifyPaymentRequest(BaseModel):
+    order_id: str
+    payment_id: str
 
 # ==========================================
 # PART 4: DYNAMIC KNOWLEDGE ENGINE
@@ -431,6 +475,248 @@ async def evaluate_answer(request: EvaluationRequest):
     except Exception as e:
         logger.error(f"Evaluation Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Something went wrong during AI evaluation: {str(e)}")
+
+# ==========================================
+# PART 6: RAZORPAY WEBHOOK & RECONCILIATION
+# ==========================================
+import hmac
+import hashlib
+import asyncio
+
+class ReconcileRequest(BaseModel):
+    order_id: str
+    payment_id: str
+    amount: int
+    currency: str
+    status: str
+
+@app.post("/internal/create-order")
+async def create_internal_order(req: CreateOrderRequest, request: Request):
+    # 🔐 Validate internal secret
+    internal_token = request.headers.get("X-Internal-Secret")
+    secret = os.environ.get("INTERNAL_API_SECRET")
+    
+    if not secret:
+        logger.error("[CRITICAL] INTERNAL_API_SECRET is missing. Rejecting order creation.")
+        raise HTTPException(status_code=500, detail="Server misconfiguration")
+        
+    if internal_token != secret:
+        logger.warning(f"[SECURITY_ALERT] unauthorized access attempt on internal order creation from {request.client.host}")
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    if not supabase_admin:
+        raise HTTPException(status_code=500, detail="Supabase admin not initialized")
+
+    try:
+        # Insert into payments table using admin client to bypass RLS
+        def run_insert():
+            return supabase_admin.table("payments").insert({
+                "order_id": req.order_id,
+                "user_id": req.user_id,
+                "amount": req.amount,
+                "currency": req.currency,
+                "status": "created"
+            }).execute()
+
+        await asyncio.to_thread(run_insert)
+        print(f"[BACKEND] Order stored: {req.order_id}")
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"[ERROR] Internal order creation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to store order")
+
+@app.post("/internal/verify-payment")
+async def verify_internal_payment(req: VerifyPaymentRequest, request: Request):
+    # 🔐 Validate internal request
+    internal_token = request.headers.get("X-Internal-Secret")
+    secret = os.environ.get("INTERNAL_API_SECRET")
+    
+    if not secret:
+        logger.error("[CRITICAL] INTERNAL_API_SECRET is missing. Rejecting verification.")
+        raise HTTPException(status_code=500, detail="Server misconfiguration")
+        
+    if internal_token != secret:
+        logger.warning(f"[SECURITY_ALERT] unauthorized access attempt on internal verification from {request.client.host}")
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    if not supabase_admin:
+        raise HTTPException(status_code=500, detail="Supabase admin not initialized")
+
+    try:
+        # 1. Fetch record from payments table using order_id
+        def get_payment():
+            return supabase_admin.table("payments").select("*").eq("order_id", req.order_id).execute()
+        
+        res = await asyncio.to_thread(get_payment)
+        
+        if not res.data or len(res.data) == 0:
+            logger.warning(f"[SECURITY_ALERT] missing order: {req.order_id}")
+            raise HTTPException(status_code=404, detail="Order not found")
+            
+        payment_record = res.data[0]
+        
+        # Idempotency check
+        if payment_record.get("status") == "captured":
+            return {"status": "already_processed"}
+            
+        user_id = payment_record.get("user_id")
+
+        # 2. Update payment status
+        def update_payment():
+            return supabase_admin.table("payments").update({
+                "status": "captured",
+                "payment_id": req.payment_id
+            }).eq("order_id", req.order_id).execute()
+            
+        await asyncio.to_thread(update_payment)
+
+        # 3. Upgrade user to premium
+        def upgrade_user():
+            return supabase_admin.table("users").update({
+                "tier": "premium"
+            }).eq("id", user_id).execute()
+            
+        await asyncio.to_thread(upgrade_user)
+        
+        logger.info(f"[SUCCESS] user upgraded: {user_id}")
+        return {"status": "verified"}
+        
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"[CRITICAL ERROR] Payment verification failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error during verification")
+
+@app.post("/internal/reconcile")
+async def reconcile_payment(req: ReconcileRequest, request: Request):
+    # 🛡️ Apply rate limiting
+    await check_rate_limit(request)
+    
+    # 🔐 Mandatory internal secret - No fallback allowed
+    internal_token = request.headers.get("X-Internal-Secret")
+    secret = os.environ.get("INTERNAL_API_SECRET")
+    if not secret:
+        logger.error("[CRITICAL] INTERNAL_API_SECRET is missing. Rejecting reconciliation.")
+        raise HTTPException(status_code=500, detail="Server misconfiguration")
+        
+    if internal_token != secret:
+        logger.warning(f"[SECURITY_ALERT] unauthorized access attempt on internal reconciliation from {request.client.host}")
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    if not supabase_admin:
+        raise HTTPException(status_code=500, detail="Supabase admin not initialized")
+
+    try:
+        # Using atomic RPC for reconciliation too to prevent duplicate upgrades
+        def run_rpc():
+            return supabase_admin.rpc('confirm_payment_success', {
+                'p_order_id': req.order_id,
+                'p_payment_id': req.payment_id,
+                'p_event_id': f"reconcile_{req.order_id}_{int(time.time())}", # manual event_id for reconciliation
+                'p_amount': req.amount
+            }).execute()
+
+        result = await asyncio.wait_for(asyncio.to_thread(run_rpc), timeout=10.0)
+        
+        rpc_data = result.data if hasattr(result, 'data') else result
+        if rpc_data.get('status') == 'error':
+            logger.warning(f"[SECURITY_ALERT] reconciliation rejected: {rpc_data.get('message')}")
+            raise HTTPException(status_code=400, detail=rpc_data.get('message'))
+            
+        return {"status": rpc_data.get('status')}
+    except Exception as e:
+        logger.error(f"[ERROR] Internal reconciliation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Reconciliation failed")
+
+
+@app.post("/webhook/razorpay")
+async def razorpay_webhook(request: Request):
+    # 🛡️ Apply rate limiting
+    await check_rate_limit(request)
+    
+    try:
+        # 1. RAW BODY VALIDATION (CRITICAL)
+        raw_body = await request.body()
+        received_signature = request.headers.get("X-Razorpay-Signature")
+        
+        if not received_signature:
+            logger.warning("[SECURITY_ALERT] Missing Razorpay signature")
+            return JSONResponse(content={"error": "Missing signature"}, status_code=400)
+
+        # 2. VERIFY SIGNATURE
+        secret = os.environ.get("RAZORPAY_WEBHOOK_SECRET")
+        if not secret:
+            logger.error("[CRITICAL] RAZORPAY_WEBHOOK_SECRET is not configured.")
+            return JSONResponse(content={"error": "Internal configuration error"}, status_code=500)
+            
+        expected_signature = hmac.new(
+            bytes(secret, 'utf-8'),
+            raw_body,
+            hashlib.sha256
+        ).hexdigest()
+
+        # 3. COMPARE SIGNATURE
+        if expected_signature != received_signature:
+            logger.warning(f"[SECURITY_ALERT] Invalid webhook signature from {request.client.host}")
+            return JSONResponse(content={"error": "Invalid signature"}, status_code=400)
+
+        # 4. PARSE JSON ONLY AFTER VERIFICATION
+        payload = json.loads(raw_body)
+        event_type = payload.get("event")
+        event_id = payload.get("id")
+
+        logger.info(f"[INFO] Webhook event received: {event_type} (ID: {event_id})")
+
+        # 5. HANDLE ONLY IMPORTANT EVENTS
+        if event_type != "payment.captured":
+            logger.info(f"[INFO] Ignoring event: {event_type}")
+            return {"status": "ok"}
+
+        # 6. EXTRACT DATA
+        payment_entity = payload.get("payload", {}).get("payment", {}).get("entity", {})
+        order_id = payment_entity.get("order_id")
+        payment_id = payment_entity.get("id")
+        amount = payment_entity.get("amount")
+
+        if not order_id or not payment_id:
+            logger.error(f"[ERROR] Missing data in payload for event {event_id}")
+            return {"status": "ok"}
+
+        # 7-9. IDEMPOTENCY, ATOMIC TRANSACTION, AND DATABASE UPDATE (VIA RPC)
+        if supabase_admin:
+            try:
+                def call_rpc():
+                    return supabase_admin.rpc('confirm_payment_success', {
+                        'p_order_id': order_id,
+                        'p_payment_id': payment_id,
+                        'p_event_id': event_id,
+                        'p_amount': int(amount)
+                    }).execute()
+
+                result = await asyncio.wait_for(asyncio.to_thread(call_rpc), timeout=10.0)
+                rpc_data = result.data if hasattr(result, 'data') else result
+
+                # 10. LOGGING & RESPONSE
+                if rpc_data.get('status') == 'success':
+                    logger.info(f"[SUCCESS] Payment captured via webhook for Order {order_id}")
+                    return {"status": "ok"}
+                elif rpc_data.get('status') in ['already_processed', 'already_captured']:
+                    logger.warning(f"[WARNING] Duplicate webhook ignored for Event {event_id}")
+                    return {"status": "already_processed"}
+                else:
+                    logger.error(f"[CRITICAL_ERROR] Webhook processing failed: {rpc_data.get('message')}")
+            except Exception as e:
+                logger.error(f"[CRITICAL_ERROR] Database interaction failed: {str(e)}")
+        else:
+            logger.error("[CRITICAL] Supabase admin client not initialized.")
+
+        # 11. RESPONSE
+        return {"status": "ok"}
+
+    except Exception as e:
+        # 12. FAILSAFE
+        logger.error(f"[CRITICAL_ERROR] Webhook processing failed: {str(e)}")
+        return {"status": "ok"}
 
 if __name__ == "__main__":
     import uvicorn

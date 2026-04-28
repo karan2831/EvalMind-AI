@@ -60,7 +60,9 @@ function SignupForm() {
       setConfirmPassword('');
       setFullName('');
     } else {
-      router.push('/evaluate');
+      // 🔐 SSR FIX: Get session to force cookie creation, then hard redirect
+      await supabase.auth.getSession();
+      window.location.href = '/evaluate';
     }
   };
 

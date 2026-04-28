@@ -15,6 +15,7 @@
     "@tailwindcss/postcss": "^4.2.2",
     "lucide-react": "latest",
     "next": "latest",
+    "razorpay": "^2.9.6",
     "react": "latest",
     "react-dom": "latest"
   },

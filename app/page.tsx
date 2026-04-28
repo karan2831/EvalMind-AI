@@ -44,12 +44,13 @@ export default function LandingPage() {
         <div className="max-w-4xl mx-auto flex flex-col items-center text-center">
           <div className="mb-6 flex flex-col items-center">
             <div className="p-4 rounded-2xl bg-white shadow-sm border border-gray-100 flex items-center justify-center">
-              <div className="relative w-[clamp(100px,10vw,140px)] aspect-square">
+              <div className="relative flex items-center justify-center w-[clamp(100px,10vw,140px)] aspect-square">
                 <Image 
                   src="/logo.jpeg" 
                   alt="EvalMind AI" 
-                  fill
-                  className="object-cover rounded-xl"
+                  width={140}
+                  height={140}
+                  className="object-cover rounded-xl w-full h-full"
                   priority
                 />
               </div>

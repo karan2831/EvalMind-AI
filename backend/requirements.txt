@@ -6,3 +6,4 @@ pydantic
 pymupdf
 python-multipart
 google-generativeai
+supabase

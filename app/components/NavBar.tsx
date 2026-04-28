@@ -13,29 +13,45 @@ export default function NavBar() {
   const pathname = usePathname();
 
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
+    let mounted = true;
+
+    const loadInitialSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (mounted) {
         setUser(session?.user || null);
-      } catch (err) {
-        console.error("Session fetch error:", err);
-      } finally {
         setLoading(false);
       }
     };
-    fetchUser();
+
+    loadInitialSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return;
+
       console.log("Auth event:", event);
       if (event === 'SIGNED_IN' && !user) {
         setShowWelcome(true);
-        setTimeout(() => setShowWelcome(false), 4000);
+        setTimeout(() => mounted && setShowWelcome(false), 4000);
       }
       setUser(session?.user || null);
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    const handlePaymentSuccess = async () => {
+      console.log("[EVENT] Payment success detected, refreshing UI");
+      const { data: { session } } = await supabase.auth.getSession();
+      if (mounted) {
+        setUser(session?.user || null);
+      }
+    };
+
+    window.addEventListener('payment-success', handlePaymentSuccess);
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+      window.removeEventListener('payment-success', handlePaymentSuccess);
+    };
   }, []);
 
   const isActive = (path: string) => pathname === path;
@@ -48,11 +64,12 @@ export default function NavBar() {
           {/* Left: Logo & Branding */}
           <Link href="/" className="flex items-center gap-2 md:gap-3 transition-all duration-200 active:scale-95 group">
             <div className="flex items-center justify-center p-1 md:p-1.5 bg-white border border-gray-100 rounded-lg shadow-sm transition-transform duration-300 group-hover:scale-105 shrink-0">
-              <div className="relative w-7 h-7 md:w-8 md:h-8">
+              <div className="relative flex items-center justify-center w-7 h-7 md:w-8 md:h-8">
                 <Image 
                   src="/logo.jpeg" 
                   alt="EvalMind AI Logo" 
-                  fill
+                  width={32}
+                  height={32}
                   className="object-cover rounded-md"
                   priority
                 />
