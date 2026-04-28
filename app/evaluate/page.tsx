@@ -3,6 +3,7 @@
 import NavBar from '@/app/components/NavBar';
 import { supabase } from '@/lib/supabaseClient';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Footer from '@/app/components/Footer';
 import { PageSkeleton } from '@/app/components/skeletons/PageSkeleton';
 import { Upload, Lock } from "lucide-react";
@@ -23,6 +24,7 @@ const INPUT_MODES = [
 ];
 
 export default function EvaluatePage() {
+  const router = useRouter();
   const [inputMode, setInputMode] = useState('manual');
   const [selectedQuestion, setSelectedQuestion] = useState(PREDEFINED_QUESTIONS[0]);
   const [customQuestion, setCustomQuestion] = useState("");
