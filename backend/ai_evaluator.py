@@ -8,12 +8,27 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Configure Gemini API Client
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY not found in environment variables")
+    raise ValueError("❌ GEMINI_API_KEY is missing. Please set it in environment variables.")
+
+print("[GEMINI INIT] Using key:", GEMINI_API_KEY[:6] + "****")
 
 client = genai.Client(api_key=GEMINI_API_KEY)
+
+# Startup test to verify API key works
+try:
+    _test = client.models.generate_content(
+        model="gemini-1.5-flash",
+        contents=[{
+            "role": "user",
+            "parts": [{"text": "Hello"}]
+        }]
+    )
+    print("✅ Gemini API key working")
+except Exception as _e:
+    print("❌ Gemini API key invalid or no access:", _e)
 
 # Safe fallback — returned when AI fails or returns invalid data
 EVALUATION_FALLBACK = {
@@ -128,11 +143,14 @@ If unable, return {{}}.
 }}
 """
 
-        model_name = 'gemini-1.5-flash-latest'
+        model_name = 'gemini-1.5-flash'
         print("[AI MODEL]", model_name)
         response = client.models.generate_content(
             model=model_name,
-            contents=prompt
+            contents=[{
+                "role": "user",
+                "parts": [{"text": prompt}]
+            }]
         )
         result = _parse_json_response(response.text)
 
@@ -179,11 +197,14 @@ Return strictly valid JSON only.
 }}
 """
 
-        model_name = 'gemini-1.5-pro-latest'
+        model_name = 'gemini-1.5-pro'
         print("[AI MODEL]", model_name)
         response = client.models.generate_content(
             model=model_name,
-            contents=prompt
+            contents=[{
+                "role": "user",
+                "parts": [{"text": prompt}]
+            }]
         )
         result = _parse_json_response(response.text)
 
