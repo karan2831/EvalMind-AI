@@ -8,6 +8,7 @@ import { usePathname, useRouter } from 'next/navigation';
 
 export default function NavBar() {
   const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showWelcome, setShowWelcome] = useState(false);
   const pathname = usePathname();
@@ -71,6 +72,26 @@ export default function NavBar() {
     };
   }, []);
 
+  useEffect(() => {
+    const fetchNavProfile = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { data } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", session.user.id)
+        .single();
+
+      if (data) setProfile(data);
+    };
+
+    fetchNavProfile();
+
+    window.addEventListener("profile-updated", fetchNavProfile);
+    return () => window.removeEventListener("profile-updated", fetchNavProfile);
+  }, []);
+
   const isActive = (path: string) => pathname === path;
 
   return (
@@ -87,8 +108,7 @@ export default function NavBar() {
                   alt="EvalMind AI Logo" 
                   width={32}
                   height={32}
-                  style={{ width: "auto", height: "auto" }}
-                  className="object-cover rounded-md"
+                  className="object-cover rounded-md w-auto h-auto"
                   priority
                 />
               </div>
@@ -120,8 +140,27 @@ export default function NavBar() {
             {loading ? (
               <div className="w-10 h-10 rounded-full bg-gray-50 animate-pulse border border-gray-100"></div>
             ) : user ? (
-              <Link href="/profile" className="w-10 h-10 rounded-full overflow-hidden border border-gray-200 hover:shadow-md transition-all duration-200 active:scale-90 hover:border-blue-200">
-                <img alt="User Profile" className="w-full h-full object-cover" src={`https://ui-avatars.com/api/?name=${user.user_metadata?.full_name || 'User'}&background=2563eb&color=fff`} />
+              <Link href="/profile" className="w-10 h-10 rounded-full overflow-hidden border border-gray-200 hover:shadow-md transition-all duration-200 active:scale-90 hover:border-blue-200 flex items-center justify-center bg-white">
+                {profile?.avatar && ['smile', 'cat', 'dog', 'octopus', 'lion', 'bot', 'ghost', 'sparkles'].includes(profile.avatar) ? (
+                  <span className="text-xl select-none">
+                    {profile.avatar === 'smile' ? '😀' : 
+                     profile.avatar === 'cat' ? '😺' : 
+                     profile.avatar === 'dog' ? '🐶' : 
+                     profile.avatar === 'octopus' ? '🐙' : 
+                     profile.avatar === 'lion' ? '🦁' : 
+                     profile.avatar === 'bot' ? '🤖' : 
+                     profile.avatar === 'ghost' ? '👻' : '✨'}
+                  </span>
+                ) : (
+                  <img 
+                    alt="User Profile" 
+                    className="w-full h-full object-cover" 
+                    src={profile?.avatar && profile.avatar.startsWith('avatar')
+                      ? `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.avatar === 'avatar1' ? 'Felix' : profile.avatar === 'avatar2' ? 'Aneka' : profile.avatar === 'avatar3' ? 'Buddy' : profile.avatar === 'avatar4' ? 'Cookie' : profile.avatar === 'avatar5' ? 'Daisy' : 'Elvis'}`
+                      : `https://ui-avatars.com/api/?name=${profile?.full_name || user.user_metadata?.full_name || 'User'}&background=2563eb&color=fff`
+                    } 
+                  />
+                )}
               </Link>
             ) : (
               <Link href="/login" className="text-xs font-bold uppercase tracking-widest text-gray-700 bg-white border border-gray-200 px-6 py-2.5 rounded-xl shadow-sm hover:bg-gray-50 hover:border-gray-300 hover:shadow-md transition-all duration-200 active:scale-[0.98]">

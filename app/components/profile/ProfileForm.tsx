@@ -4,9 +4,12 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import AvatarSelector from './AvatarSelector';
 
-export default function ProfileForm() {
+interface ProfileFormProps {
+  selectedAvatar: string;
+}
+
+export default function ProfileForm({ selectedAvatar }: ProfileFormProps) {
   const [fullName, setFullName] = useState('');
-  const [selectedAvatar, setSelectedAvatar] = useState('avatar1');
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -23,7 +26,6 @@ export default function ProfileForm() {
         
         if (data) {
           setFullName(data.full_name || '');
-          setSelectedAvatar(data.avatar || 'avatar1');
         }
       } catch (error) {
         console.error('Error loading profile:', error);
@@ -44,12 +46,16 @@ export default function ProfileForm() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-      const response = await fetch(`${backendUrl}/internal/profile/update`, {
-        method: 'POST',
+      const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+      if (!BASE_URL) {
+        throw new Error("Backend URL not configured");
+      }
+
+      const response = await fetch(`${BASE_URL}/profile/update`, {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
           full_name: fullName,
@@ -61,10 +67,13 @@ export default function ProfileForm() {
       console.log("API response:", data);
 
       if (!response.ok) {
-        throw new Error(data?.detail || "Request failed");
+        throw new Error(data?.detail || "Profile update failed");
       }
 
       setMessage({ type: 'success', text: 'Profile updated successfully!' });
+      
+      // Dispatch event to refresh UI across app
+      window.dispatchEvent(new Event("profile-updated"));
     } catch (error: any) {
       console.error('Update error:', error);
       setMessage({ type: 'error', text: error.message || 'Failed to update profile.' });
@@ -79,11 +88,6 @@ export default function ProfileForm() {
 
   return (
     <form onSubmit={handleSave} className="bg-white border border-gray-100 rounded-3xl p-8 shadow-sm space-y-8">
-      <div className="space-y-4">
-        <label className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em]">Select Avatar</label>
-        <AvatarSelector selectedId={selectedAvatar} onSelect={setSelectedAvatar} />
-      </div>
-
       <div className="space-y-2">
         <label className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em]">Full Name</label>
         <input

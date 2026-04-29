@@ -18,8 +18,15 @@ export default function SupportForm() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-      console.log("Calling API:", `${backendUrl}/support/create`);
+      const userEmail = session.user.email;
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://evalmind-ai.onrender.com";
+      
+      console.log("Sending support request:", {
+        subject,
+        description,
+        user_email: userEmail
+      });
+
       const response = await fetch(`${backendUrl}/support/create`, {
         method: 'POST',
         headers: {
@@ -27,9 +34,9 @@ export default function SupportForm() {
           'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
-          subject,
-          description,
-          user_email: session.user.email
+          subject: subject,
+          description: description,
+          user_email: userEmail
         })
       });
 

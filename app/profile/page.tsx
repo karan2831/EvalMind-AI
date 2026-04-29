@@ -8,6 +8,7 @@ import Footer from '@/app/components/Footer';
 import { PageSkeleton } from '@/app/components/skeletons/PageSkeleton';
 import ProfileForm from '@/app/components/profile/ProfileForm';
 import SupportForm from '@/app/components/support/SupportForm';
+import AvatarSelector from '@/app/components/profile/AvatarSelector';
 
 export default function ProfilePage() {
   const [user, setUser] = useState<any>(null);
@@ -15,6 +16,8 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'profile' | 'support'>('profile');
+  const [avatar, setAvatar] = useState('smile');
+  const [showDropdown, setShowDropdown] = useState(false);
   const router = useRouter();
 
   const fetchProfile = async (userId: string) => {
@@ -27,6 +30,7 @@ export default function ProfilePage() {
       
       if (!error && data) {
         setProfile(data);
+        setAvatar(data.avatar || 'smile');
         return data;
       }
     } catch (err) {
@@ -75,6 +79,23 @@ export default function ProfilePage() {
       subscription.unsubscribe();
     };
   }, [router]);
+  
+  useEffect(() => {
+    const handler = () => {
+      if (user) fetchProfile(user.id);
+    };
+
+    window.addEventListener("profile-updated", handler);
+    return () => window.removeEventListener("profile-updated", handler);
+  }, [user]);
+  
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!showDropdown) return;
+    const handleClick = () => setShowDropdown(false);
+    window.addEventListener('click', handleClick);
+    return () => window.removeEventListener('click', handleClick);
+  }, [showDropdown]);
 
   useEffect(() => {
     const handler = () => {
@@ -247,30 +268,70 @@ export default function ProfilePage() {
         {/* Profile Header */}
         <section className="flex flex-col items-center text-center space-y-4">
           <div className="relative">
-            <div className={`w-24 h-24 rounded-full overflow-hidden border-2 border-white shadow-md bg-white flex items-center justify-center ${profileLoading ? 'animate-pulse' : ''}`}>
+            <div 
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowDropdown(!showDropdown);
+              }}
+              className={`w-24 h-24 rounded-full overflow-hidden border-2 border-white shadow-md bg-white flex items-center justify-center cursor-pointer group hover:scale-105 transition-all duration-300 ${profileLoading ? 'animate-pulse' : ''}`}
+            >
               {profileLoading ? (
                 <div className="w-full h-full bg-gray-200" />
-              ) : profile?.avatar && ['smile', 'cat', 'dog', 'octopus', 'lion', 'bot', 'ghost', 'sparkles'].includes(profile.avatar) ? (
-                <span className="text-5xl select-none">
-                  {profile.avatar === 'smile' ? '😀' : 
-                   profile.avatar === 'cat' ? '😺' : 
-                   profile.avatar === 'dog' ? '🐶' : 
-                   profile.avatar === 'octopus' ? '🐙' : 
-                   profile.avatar === 'lion' ? '🦁' : 
-                   profile.avatar === 'bot' ? '🤖' : 
-                   profile.avatar === 'ghost' ? '👻' : '✨'}
-                </span>
               ) : (
-                <img 
-                  alt="User Avatar" 
-                  className="w-full h-full object-cover" 
-                  src={profile?.avatar && profile.avatar.startsWith('avatar')
-                    ? `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.avatar === 'avatar1' ? 'Felix' : profile.avatar === 'avatar2' ? 'Aneka' : profile.avatar === 'avatar3' ? 'Buddy' : profile.avatar === 'avatar4' ? 'Cookie' : profile.avatar === 'avatar5' ? 'Daisy' : 'Elvis'}`
-                    : `https://ui-avatars.com/api/?name=${profile?.full_name || user.user_metadata?.full_name || 'User'}&background=007aff&color=fff&size=150`
-                  } 
-                />
+                <span className="text-5xl select-none">
+                  {avatar === 'smile' ? '😀' : 
+                   avatar === 'cat' ? '😺' : 
+                   avatar === 'dog' ? '🐶' : 
+                   avatar === 'octopus' ? '🐙' : 
+                   avatar === 'lion' ? '🦁' : 
+                   avatar === 'bot' ? '🤖' : 
+                   avatar === 'ghost' ? '👻' : 
+                   avatar === 'sparkles' ? '✨' : '👤'}
+                </span>
+              )}
+              
+              {/* Edit Overlay */}
+              {!profileLoading && (
+                <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <span className="material-symbols-outlined text-white text-xl">edit</span>
+                </div>
               )}
             </div>
+
+            {/* Edit Icon Badge */}
+            {!profileLoading && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowDropdown(!showDropdown);
+                }}
+                className="absolute bottom-0 right-0 bg-white border border-gray-100 rounded-full p-1.5 shadow-lg hover:scale-110 transition-transform z-10"
+              >
+                <span className="material-symbols-outlined text-[16px] text-gray-600">edit</span>
+              </button>
+            )}
+
+            {/* Compact Dropdown */}
+            {showDropdown && (
+              <div 
+                onClick={(e) => e.stopPropagation()}
+                className="absolute top-full mt-4 left-1/2 -translate-x-1/2 bg-white border border-gray-100 rounded-2xl shadow-2xl p-4 z-50 w-64 animate-in fade-in zoom-in duration-200"
+              >
+                <div className="flex items-center justify-between mb-3 px-1">
+                  <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Choose Avatar</span>
+                  <button onClick={() => setShowDropdown(false)} className="text-gray-400 hover:text-gray-600">
+                    <span className="material-symbols-outlined text-sm">close</span>
+                  </button>
+                </div>
+                <AvatarSelector
+                  selectedId={avatar}
+                  onSelect={(val) => {
+                    setAvatar(val);
+                    setShowDropdown(false);
+                  }}
+                />
+              </div>
+            )}
           </div>
           <div>
             {profileLoading ? (
@@ -303,16 +364,16 @@ export default function ProfilePage() {
         </section>
 
         {/* Tabs */}
-        <div className="flex bg-gray-100 p-1 rounded-2xl gap-1">
+        <div className="flex flex-col gap-2">
           <button 
             onClick={() => setActiveTab('profile')}
-            className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'profile' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+            className={`w-full text-left px-4 py-3 rounded-xl transition-all font-bold text-sm ${activeTab === 'profile' ? 'bg-blue-50 text-blue-600 border border-blue-200 shadow-sm' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
           >
             Personal Info
           </button>
           <button 
             onClick={() => setActiveTab('support')}
-            className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'support' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+            className={`w-full text-left px-4 py-3 rounded-xl transition-all font-bold text-sm ${activeTab === 'support' ? 'bg-blue-50 text-blue-600 border border-blue-200 shadow-sm' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
           >
             Support
           </button>
@@ -320,7 +381,7 @@ export default function ProfilePage() {
 
         {/* Dynamic Section */}
         <section className="space-y-6">
-          {activeTab === 'profile' && <ProfileForm />}
+          {activeTab === 'profile' && <ProfileForm selectedAvatar={avatar} />}
           {activeTab === 'support' && <SupportForm />}
 
           <div className="pt-6">

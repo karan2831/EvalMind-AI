@@ -95,8 +95,7 @@ function SignupForm() {
                 alt="EvalMind AI Logo" 
                 width={32}
                 height={32}
-                style={{ width: "auto", height: "auto" }}
-                className="object-cover"
+                className="object-cover w-auto h-auto"
                 priority
               />
             </div>

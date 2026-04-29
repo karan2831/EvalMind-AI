@@ -60,8 +60,7 @@ export default function LandingPage() {
                   alt="EvalMind AI" 
                   width={140}
                   height={140}
-                  className="object-cover rounded-xl"
-                  style={{ width: "100%", height: "auto" }}
+                  className="object-cover rounded-xl w-full h-auto"
                   priority
                 />
               </div>

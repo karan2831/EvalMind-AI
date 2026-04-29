@@ -171,25 +171,36 @@ async def create_support(data: SupportRequest):
     try:
         logger.info(f"[SUPPORT] Incoming request: {data}")
 
+        if not data.subject or not data.subject.strip():
+            raise HTTPException(status_code=400, detail="Subject is required")
+
+        if not data.description or not data.description.strip():
+            raise HTTPException(status_code=400, detail="Description is required")
+
         if not supabase_admin:
             logger.error("[SUPPORT] Supabase not initialized")
 
-        # DB insert
+        # --- DB INSERT (non-blocking) ---
         try:
+            insert_data = {
+                "user_id": None,
+                "subject": data.subject,
+                "description": data.description,
+                "status": "pending"
+            }
+
+            if data.user_email:
+                insert_data["user_email"] = data.user_email
+
             def insert_s():
-                return supabase_admin.table("support_requests").insert({
-                    "user_id": None,
-                    "subject": data.subject,
-                    "description": data.description,
-                    "user_email": data.user_email,
-                    "status": "pending"
-                }).execute()
+                return supabase_admin.table("support_requests").insert(insert_data).execute()
 
             if supabase_admin:
                 await asyncio.to_thread(insert_s)
-                logger.info("[SUPPORT] Saved to DB")
+                logger.info(f"[SUPPORT] Stored request for: {data.user_email}")
+
         except Exception as db_e:
-            logger.error(f"[SUPPORT] DB error: {db_e}")
+            logger.error(f"[SUPPORT] DB save failed: {db_e}")
 
         # Email
         RESEND_API_KEY = os.getenv("RESEND_API_KEY")
@@ -215,7 +226,8 @@ async def create_support(data: SupportRequest):
                     },
                     timeout=5
                 )
-                logger.info(f"[SUPPORT] Email sent: {res.status_code}")
+                logger.info(f"[SUPPORT] Email status: {res.status_code}")
+                logger.info(f"[SUPPORT] Email response: {res.text}")
             except Exception as e:
                 logger.error(f"[SUPPORT] Email error: {e}")
 
@@ -382,6 +394,7 @@ def calculate_metrics(student_answer: str, key_points: List[str], marks: int):
 # ==========================================
 @app.post("/evaluate-pdf", dependencies=[Depends(check_rate_limit), Depends(verify_token)])
 async def evaluate_pdf(
+    request: Request,
     file: UploadFile = File(...),
     marks: int = Form(...),
     mode: str = Form(...),
@@ -412,9 +425,51 @@ async def evaluate_pdf(
         if marks not in [2, 5, 10]: raise HTTPException(status_code=400, detail="Marks must be 2, 5, or 10")
         if len(txt) > 20000: raise HTTPException(status_code=400, detail="PDF content too long.")
 
+        # Step 1: auth + usage check
+        user_id_for_usage = None
+        current_usage_count = 0
+        if mode in ["answer_sheet", "combined"]:
+            try:
+                auth_header = request.headers.get("Authorization")
+
+                if not auth_header or not auth_header.startswith("Bearer "):
+                    raise HTTPException(status_code=401, detail="Unauthorized")
+
+                token = auth_header.split(" ")[1]
+
+                user_response = supabase_admin.auth.get_user(token)
+
+                if not user_response or not user_response.user:
+                    raise HTTPException(status_code=401, detail="Invalid user")
+
+                user_id_for_usage = user_response.user.id
+
+                user_data = supabase_admin.table("users") \
+                    .select("usage_count, tier") \
+                    .eq("id", user_id_for_usage) \
+                    .single() \
+                    .execute()
+
+                current_usage_count = user_data.data.get("usage_count", 0)
+                tier = user_data.data.get("tier", "free")
+
+                # 🔒 HARD LIMIT ENFORCEMENT
+                if tier != "premium" and current_usage_count >= 20:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Monthly limit reached"
+                    )
+
+            except HTTPException:
+                # IMPORTANT: re-raise it
+                raise
+            except Exception as e:
+                logger.error(f"[USAGE FETCH ERROR] {e}")
+
+        # Step 2: run evaluation
         if mode == "answer_sheet":
             if not question or len(question) < 5: raise HTTPException(status_code=400, detail="Question is too short.")
-            return await evaluate_answer(EvaluationRequest(question=question, answer=txt, marks=marks))
+            res = await evaluate_answer(EvaluationRequest(question=question, answer=txt, marks=marks))
         elif mode == "combined":
             pattern = re.compile(r'(?:Question|Q):?\s*(.*?)\s*(?:Answer|A):?\s*(.*?)(?=(?:Question|Q):|$)', re.DOTALL | re.IGNORECASE)
             pairs = pattern.findall(txt)
@@ -422,11 +477,39 @@ async def evaluate_pdf(
             total = 0
             evs = []
             for q, a in pairs:
-                res = await evaluate_answer(EvaluationRequest(question=q, answer=a, marks=marks))
-                evs.append({"question": q, "result": res})
-                total += res.score
-            return {"evaluations": evs, "total_score": total, "total_max_score": len(evs)*marks, "count": len(evs), "extracted_text_preview": txt[:300]}
-        else: raise HTTPException(status_code=400, detail="Invalid evaluation mode.")
+                eval_res = await evaluate_answer(EvaluationRequest(question=q, answer=a, marks=marks))
+                evs.append({"question": q, "result": eval_res})
+                total += eval_res.score
+            res = {"evaluations": evs, "total_score": total, "total_max_score": len(evs)*marks, "count": len(evs), "extracted_text_preview": txt[:300]}
+        else:
+            raise HTTPException(status_code=400, detail="Invalid evaluation mode.")
+            
+        # Step 3: increment usage AFTER success
+        if mode in ["answer_sheet", "combined"] and user_id_for_usage:
+            try:
+                result = await asyncio.to_thread(
+                    lambda: supabase_admin.rpc(
+                        "increment_usage_safe",
+                        {"uid": user_id_for_usage}
+                    ).execute()
+                )
+
+                success = result.data
+
+                if not success:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Monthly limit reached"
+                    )
+
+            except HTTPException:
+                # IMPORTANT: re-raise it
+                raise
+            except Exception as e:
+                # Only log, do not break evaluation
+                logger.error(f"[USAGE INCREMENT ERROR] {e}")
+
+        return res
         
     except HTTPException as he: raise he
     except Exception as e:
