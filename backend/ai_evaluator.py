@@ -20,7 +20,7 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 # Startup test to verify API key works
 try:
     _test = client.models.generate_content(
-        model="gemini-1.5-flash",
+        model="gemini-1.0-pro",
         contents=[{
             "role": "user",
             "parts": [{"text": "Hello"}]
@@ -143,7 +143,7 @@ If unable, return {{}}.
 }}
 """
 
-        model_name = 'gemini-1.5-flash'
+        model_name = 'gemini-1.0-pro'
         print("[AI MODEL]", model_name)
         response = client.models.generate_content(
             model=model_name,
@@ -197,7 +197,7 @@ Return strictly valid JSON only.
 }}
 """
 
-        model_name = 'gemini-1.5-pro'
+        model_name = 'gemini-1.0-pro'
         print("[AI MODEL]", model_name)
         response = client.models.generate_content(
             model=model_name,
