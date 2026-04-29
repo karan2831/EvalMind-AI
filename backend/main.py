@@ -157,8 +157,8 @@ class VerifyPaymentRequest(BaseModel):
     payment_id: str
 
 class ProfileUpdate(BaseModel):
-    full_name: str
-    avatar: str
+    full_name: Optional[str] = None
+    avatar: Optional[str] = None
 
 # --- Support Route (Direct) ---
 class SupportRequest(BaseModel):
@@ -509,6 +509,26 @@ async def evaluate_pdf(
                 # Only log, do not break evaluation
                 logger.error(f"[USAGE INCREMENT ERROR] {e}")
 
+        # Step 4: Save History
+        if user_id_for_usage:
+            try:
+                score = res.get("total_score") if isinstance(res, dict) and "total_score" in res else getattr(res, "score", None)
+                result_data = res if isinstance(res, dict) else res.model_dump()
+                
+                def save_history():
+                    return supabase_admin.table("history").insert({
+                        "user_id": user_id_for_usage,
+                        "input_text": txt,
+                        "result": result_data,
+                        "score": score
+                    }).execute()
+                
+                hist_res = await asyncio.to_thread(save_history)
+                print("[HISTORY SAVED]", hist_res.data)
+            except Exception as e:
+                print("[HISTORY ERROR]", e)
+                logger.error(f"[HISTORY ERROR] {e}")
+
         return res
         
     except HTTPException as he: raise he
@@ -664,12 +684,13 @@ async def update_profile(req: ProfileUpdate, request: Request):
         user_id = user_res.user.id
         
         def upsert_p():
-            return supabase_admin.table("profiles").upsert({
-                "id": user_id,
-                "full_name": req.full_name,
-                "avatar": req.avatar,
-                "updated_at": "now()"
-            }).execute()
+            update_data = {"id": user_id, "updated_at": "now()"}
+            if req.full_name is not None:
+                update_data["full_name"] = req.full_name
+            if req.avatar is not None:
+                update_data["avatar"] = req.avatar
+                
+            return supabase_admin.table("profiles").upsert(update_data).execute()
         
         await asyncio.to_thread(upsert_p)
         return {"success": True}

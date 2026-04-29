@@ -6,9 +6,10 @@ import AvatarSelector from './AvatarSelector';
 
 interface ProfileFormProps {
   selectedAvatar: string;
+  onUpdate?: () => void;
 }
 
-export default function ProfileForm({ selectedAvatar }: ProfileFormProps) {
+export default function ProfileForm({ selectedAvatar, onUpdate }: ProfileFormProps) {
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
@@ -51,16 +52,20 @@ export default function ProfileForm({ selectedAvatar }: ProfileFormProps) {
         throw new Error("Backend URL not configured");
       }
 
+      const payload = {
+        full_name: fullName || "",
+        avatar: selectedAvatar || "smile"
+      };
+
+      console.log("Updating profile with payload:", payload);
+
       const response = await fetch(`${BASE_URL}/profile/update`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${session.access_token}`
         },
-        body: JSON.stringify({
-          full_name: fullName,
-          avatar: selectedAvatar
-        })
+        body: JSON.stringify(payload)
       });
 
       const data = await response.json();
@@ -72,8 +77,16 @@ export default function ProfileForm({ selectedAvatar }: ProfileFormProps) {
 
       setMessage({ type: 'success', text: 'Profile updated successfully!' });
       
-      // Dispatch event to refresh UI across app
-      window.dispatchEvent(new Event("profile-updated"));
+      // Refresh parent profile state
+      onUpdate?.();
+
+      // Sync Supabase auth metadata
+      await supabase.auth.updateUser({
+        data: {
+          full_name: payload.full_name,
+          avatar: payload.avatar
+        }
+      });
     } catch (error: any) {
       console.error('Update error:', error);
       setMessage({ type: 'error', text: error.message || 'Failed to update profile.' });

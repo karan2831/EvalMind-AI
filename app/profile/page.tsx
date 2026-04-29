@@ -341,7 +341,7 @@ export default function ProfilePage() {
               </div>
             ) : (
               <>
-                <h1 className="text-2xl font-bold tracking-tight text-[#1d1d1f]">{profile?.full_name || user.user_metadata?.full_name || 'User'}</h1>
+                <h1 className="text-2xl font-bold tracking-tight text-[#1d1d1f]">{profile?.full_name ?? user.user_metadata?.full_name ?? 'User'}</h1>
                 <div className="flex items-center justify-center gap-2 mt-1">
                   <p className="text-[#86868b] text-sm">{user.email}</p>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${profile?.tier === 'premium' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-gray-100 text-gray-500 border border-gray-200'}`}>
@@ -381,7 +381,7 @@ export default function ProfilePage() {
 
         {/* Dynamic Section */}
         <section className="space-y-6">
-          {activeTab === 'profile' && <ProfileForm selectedAvatar={avatar} />}
+          {activeTab === 'profile' && <ProfileForm selectedAvatar={profile?.avatar} onUpdate={() => fetchProfile(user.id)} />}
           {activeTab === 'support' && <SupportForm />}
 
           <div className="pt-6">

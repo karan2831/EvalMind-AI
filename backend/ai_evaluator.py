@@ -128,8 +128,10 @@ If unable, return {{}}.
 }}
 """
 
+        model_name = 'gemini-1.5-flash-latest'
+        print("[AI MODEL]", model_name)
         response = client.models.generate_content(
-            model='gemini-1.5-flash',
+            model=model_name,
             contents=prompt
         )
         result = _parse_json_response(response.text)
@@ -143,6 +145,7 @@ If unable, return {{}}.
         return _clamp_scores(result)
 
     except Exception as e:
+        print("[AI ERROR]", e)
         print(f"Evaluation Error: {e}")
         return dict(EVALUATION_FALLBACK)
 
@@ -176,8 +179,10 @@ Return strictly valid JSON only.
 }}
 """
 
+        model_name = 'gemini-1.5-pro-latest'
+        print("[AI MODEL]", model_name)
         response = client.models.generate_content(
-            model='gemini-1.5-flash',
+            model=model_name,
             contents=prompt
         )
         result = _parse_json_response(response.text)
@@ -188,5 +193,6 @@ Return strictly valid JSON only.
         return result
 
     except Exception as e:
+        print("[AI ERROR]", e)
         print(f"Improvement Error: {e}")
         return {"improved_answer": "Unable to generate improvement at this time."}
