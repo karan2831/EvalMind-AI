@@ -34,8 +34,8 @@ EVALUATION_FALLBACK = {
 
 # Groq model priority list — tries in order, falls back to OpenAI if all fail
 GROQ_MODELS = [
-    "llama-3.1-70b-versatile",
-    "llama-3.1-8b-instant"
+    "llama-3.1-8b-instant",
+    "mixtral-8x7b-32768"
 ]
 
 def _clamp_scores(result: Dict[str, Any]) -> Dict[str, Any]:
