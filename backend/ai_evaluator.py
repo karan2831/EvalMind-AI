@@ -32,6 +32,12 @@ EVALUATION_FALLBACK = {
     "missing_points": ["Add more key concepts and explanation"]
 }
 
+# Groq model priority list — tries in order, falls back to OpenAI if all fail
+GROQ_MODELS = [
+    "llama-3.1-70b-versatile",
+    "llama-3.1-8b-instant"
+]
+
 def _clamp_scores(result: Dict[str, Any]) -> Dict[str, Any]:
     """Clamp all scores to valid 0–100 integer range.
     
@@ -145,13 +151,33 @@ If unable, return {{}}.
 }}
 """
 
-        model_name = "llama-3.1-70b-versatile"
-        print("[AI MODEL]", model_name)
-        response = groq_client.chat.completions.create(
-            model=model_name,
-            temperature=0.2,
-            messages=[{"role": "user", "content": prompt}]
-        )
+        messages = [{"role": "user", "content": prompt}]
+        response = None
+
+        if groq_client:
+            for model in GROQ_MODELS:
+                try:
+                    print(f"[AI MODEL TRY] {model}")
+                    response = groq_client.chat.completions.create(
+                        model=model,
+                        messages=messages,
+                        max_tokens=800,
+                        temperature=0.2
+                    )
+                    print(f"[AI MODEL SUCCESS] {model}")
+                    break
+                except Exception as e:
+                    print(f"[MODEL FAILED] {model} → {e}")
+                    continue
+
+        if response is None:
+            print("[GROQ FAILED COMPLETELY] Switching to OpenAI")
+            response = openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=messages,
+                temperature=0.2
+            )
+
         result = _parse_json_response(response.choices[0].message.content)
 
         # Validate required fields; fall back if missing
@@ -202,13 +228,33 @@ Return strictly valid JSON only.
 }}
 """
 
-        model_name = "llama-3.1-70b-versatile"
-        print("[AI MODEL]", model_name)
-        response = groq_client.chat.completions.create(
-            model=model_name,
-            temperature=0.2,
-            messages=[{"role": "user", "content": prompt}]
-        )
+        messages = [{"role": "user", "content": prompt}]
+        response = None
+
+        if groq_client:
+            for model in GROQ_MODELS:
+                try:
+                    print(f"[AI MODEL TRY] {model}")
+                    response = groq_client.chat.completions.create(
+                        model=model,
+                        messages=messages,
+                        max_tokens=800,
+                        temperature=0.2
+                    )
+                    print(f"[AI MODEL SUCCESS] {model}")
+                    break
+                except Exception as e:
+                    print(f"[MODEL FAILED] {model} → {e}")
+                    continue
+
+        if response is None:
+            print("[GROQ FAILED COMPLETELY] Switching to OpenAI")
+            response = openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=messages,
+                temperature=0.2
+            )
+
         result = _parse_json_response(response.choices[0].message.content)
 
         if not result or "improved_answer" not in result:
