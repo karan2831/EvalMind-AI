@@ -125,9 +125,6 @@ export default function NavBar() {
             </Link>
             {!loading && user && (
               <>
-                <Link href="/history" className={`px-5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-200 ${isActive('/history') ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-900'}`}>
-                  History
-                </Link>
                 <Link href="/profile" className={`px-5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-200 ${isActive('/profile') ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-900'}`}>
                   Profile
                 </Link>
@@ -179,10 +176,6 @@ export default function NavBar() {
         </Link>
         {!loading && user && (
           <>
-            <Link href="/history" className={`flex flex-col items-center justify-center ${isActive('/history') ? 'text-[#007aff]' : 'text-gray-600 hover:text-[#1d1d1f]'} px-5 py-1.5 tap-highlight-none active:scale-90 duration-200`}>
-              <span className="material-symbols-outlined" style={isActive('/history') ? { fontVariationSettings: "'FILL' 1" } : {}}>history</span>
-              <span className="text-[10px] font-medium mt-1">History</span>
-            </Link>
             <Link href="/profile" className={`flex flex-col items-center justify-center ${isActive('/profile') ? 'text-[#007aff]' : 'text-gray-600 hover:text-[#1d1d1f]'} px-5 py-1.5 tap-highlight-none active:scale-90 duration-200`}>
               <span className="material-symbols-outlined" style={isActive('/profile') ? { fontVariationSettings: "'FILL' 1" } : {}}>person</span>
               <span className="text-[10px] font-medium mt-1">Profile</span>

@@ -19,8 +19,7 @@ const MARK_OPTIONS = [2, 5, 10];
 
 const INPUT_MODES = [
   { id: 'manual', label: 'Manual Entry', icon: 'edit_note' },
-  { id: 'answer_sheet', label: 'Answer Sheet', icon: 'description' },
-  { id: 'combined', label: 'Combined PDF', icon: 'file_copy' }
+  { id: 'pdf', label: 'PDF Upload', icon: 'description' }
 ];
 
 export default function EvaluatePage() {
@@ -53,6 +52,7 @@ export default function EvaluatePage() {
   // Access Control States
   const [usageCount, setUsageCount] = useState(0);
   const [userPlan, setUserPlan] = useState<'free' | 'premium'>('free');
+  const [pdfType, setPdfType] = useState<'answer_sheet' | 'combined'>('answer_sheet');
   const [language, setLanguage] = useState("en");
 
   // Auto-detect browser language
@@ -90,19 +90,6 @@ export default function EvaluatePage() {
             setUserPlan(profile.plan || 'free');
             console.log("USER PLAN:", profile.plan || 'free');
           }
-
-          // Fetch Monthly Usage
-          const startOfMonth = new Date();
-          startOfMonth.setDate(1);
-          startOfMonth.setHours(0, 0, 0, 0);
-
-          const { count } = await supabase
-            .from('evaluation_history')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', currentUser.id)
-            .gte('created_at', startOfMonth.toISOString());
-          
-          setUsageCount(count || 0);
         }
       } catch (err: any) {
         console.error("Initial session check failed:", err);
@@ -175,6 +162,7 @@ export default function EvaluatePage() {
       // Check session for advanced features or token passing
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
+      const userId = session?.user?.id;
 
       // GUARD: Only manual mode is public
       if (inputMode !== 'manual' && !session) {
@@ -183,10 +171,20 @@ export default function EvaluatePage() {
       }
       
       if (inputMode === 'manual') {
+        const { data: { session } } = await supabase.auth.getSession();
         const res = await fetch(`${apiUrl}/evaluate`, {
           method: "POST",
-          headers: { "Content-Type": "application/json", ...(token && { "Authorization": `Bearer ${token}` }) },
-          body: JSON.stringify({ question: finalQuestion.trim(), answer: userAnswer.trim(), marks, language })
+          headers: { 
+            "Content-Type": "application/json", 
+            "Authorization": `Bearer ${session?.access_token}` 
+          },
+          body: JSON.stringify({ 
+            question: finalQuestion.trim(), 
+            answer: userAnswer.trim(), 
+            marks, 
+            language,
+            eval_type: "manual"
+          })
         });
         await processResponse(res, isReevaluate, finalQuestion.trim(), userAnswer.trim());
       } else {
@@ -194,9 +192,11 @@ export default function EvaluatePage() {
         const formData = new FormData();
         formData.append('file', selectedFile!);
         formData.append('marks', marks.toString());
-        formData.append('mode', inputMode);
+        formData.append('mode', pdfType);
         formData.append('language', language);
-        if (inputMode === 'answer_sheet') formData.append('question', finalQuestion.trim());
+        if (pdfType === 'answer_sheet') {
+          formData.append('question', finalQuestion.trim());
+        }
 
         const res = await fetch(`${apiUrl}/evaluate-pdf`, { 
           method: "POST", 
@@ -237,12 +237,18 @@ export default function EvaluatePage() {
     if (!result || hasImproved || isImproving) return;
     setIsImproving(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
       if (!process.env.NEXT_PUBLIC_BACKEND_URL) {
         throw new Error("Backend URL not configured");
       }
       const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/ai`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token && { "Authorization": `Bearer ${token}` })
+        },
         body: JSON.stringify({
           question: isCustom ? customQuestion : selectedQuestion,
           answer: userAnswer || result.extracted_text_preview || "",
@@ -282,15 +288,18 @@ export default function EvaluatePage() {
           
           {/* Language Selector */}
           <div className="flex justify-center mt-4">
-            <select 
-              value={language} 
-              onChange={(e) => setLanguage(e.target.value)}
-              className="bg-white border border-gray-200 rounded-xl px-4 py-2 text-xs font-bold uppercase tracking-wider text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer shadow-sm"
-            >
-              <option value="en">English</option>
-              <option value="hi">Hindi</option>
-              <option value="bn">Bengali</option>
-            </select>
+            <div className="relative inline-block">
+              <select 
+                value={language} 
+                onChange={(e) => setLanguage(e.target.value)}
+                className="bg-white border border-gray-200 rounded-xl px-4 py-2 text-xs font-bold uppercase tracking-wider text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer shadow-sm appearance-none pr-8"
+              >
+                <option value="en">English</option>
+                <option value="hi">Hindi</option>
+                <option value="bn">Bengali</option>
+              </select>
+              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-[10px] pointer-events-none">▼</span>
+            </div>
           </div>
         </section>
 
@@ -360,24 +369,64 @@ export default function EvaluatePage() {
         </div>
 
         <section className="bg-white border border-gray-100 shadow-sm rounded-2xl p-8 space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div className="md:col-span-3 space-y-2">
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Question</label>
-              {isCustom ? (
-                <input type="text" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm" value={customQuestion} onChange={(e) => setCustomQuestion(e.target.value)} placeholder="Enter custom question..." />
-              ) : (
-                <select className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm" value={selectedQuestion} onChange={(e) => setSelectedQuestion(e.target.value)}>
-                  {PREDEFINED_QUESTIONS.map((q, i) => <option key={i} value={q}>{q}</option>)}
-                </select>
+          <div className="space-y-6">
+            {(inputMode === 'manual' || (inputMode === 'pdf' && pdfType === 'answer_sheet')) && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Question</label>
+                {isCustom ? (
+                  <input type="text" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all" value={customQuestion} onChange={(e) => setCustomQuestion(e.target.value)} placeholder="Enter custom question..." />
+                ) : (
+                  <div className="relative">
+                    <select className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm appearance-none pr-10 bg-white focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all" value={selectedQuestion} onChange={(e) => setSelectedQuestion(e.target.value)}>
+                      {PREDEFINED_QUESTIONS.map((q, i) => <option key={i} value={q}>{q}</option>)}
+                    </select>
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">▼</span>
+                  </div>
+                )}
+                <button onClick={() => setIsCustom(!isCustom)} className="text-[10px] font-bold text-blue-600 uppercase tracking-tight hover:text-blue-700 transition-colors">
+                  {isCustom ? "Select Predefined" : "Enter questions manually"}
+                </button>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+              {inputMode === 'pdf' && (
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">
+                    PDF Type
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={pdfType}
+                      onChange={(e) => setPdfType(e.target.value as 'answer_sheet' | 'combined')}
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm appearance-none pr-10 bg-white focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
+                    >
+                      <option value="answer_sheet">Answer Sheet Only</option>
+                      <option value="combined">Combined PDF</option>
+                    </select>
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">▼</span>
+                  </div>
+                </div>
               )}
-              <button onClick={() => setIsCustom(!isCustom)} className="text-[10px] font-bold text-blue-600 uppercase">Toggle Custom</button>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Marks</label>
+                <div className="relative">
+                  <select className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm appearance-none pr-10 bg-white focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all" value={marks} onChange={(e) => setMarks(Number(e.target.value))}>
+                    {MARK_OPTIONS.map(opt => <option key={opt} value={opt}>{opt} Marks</option>)}
+                  </select>
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">▼</span>
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Marks</label>
-              <select className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm" value={marks} onChange={(e) => setMarks(Number(e.target.value))}>
-                {MARK_OPTIONS.map(opt => <option key={opt} value={opt}>{opt} Marks</option>)}
-              </select>
-            </div>
+
+            {inputMode === 'pdf' && (
+              <p className="text-xs text-gray-400 font-medium italic -mt-4">
+                {pdfType === 'answer_sheet'
+                  ? "Upload answer sheet and provide question manually"
+                  : "Upload question + answer combined PDF"}
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">

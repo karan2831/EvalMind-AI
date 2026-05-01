@@ -12,6 +12,7 @@ import logging
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from ai_evaluator import get_evaluation_ai, get_improvement_ai
+from datetime import datetime
 
 load_dotenv()
 
@@ -111,6 +112,10 @@ class EvaluationRequest(BaseModel):
     answer: str = Field(..., min_length=5, max_length=10000)
     marks: int = Field(..., description="Must be 2, 5, or 10")
     language: str = "en"
+    user_id: Optional[str] = None
+    subject: Optional[str] = "theory"
+    internal_call: bool = False
+    eval_type: str = "manual" # manual or pdf
 
     @validator("marks")
     def validate_marks(cls, v):
@@ -471,7 +476,7 @@ async def evaluate_pdf(
         # Step 2: run evaluation
         if mode == "answer_sheet":
             if not question or len(question) < 5: raise HTTPException(status_code=400, detail="Question is too short.")
-            res = await evaluate_answer(EvaluationRequest(question=question, answer=txt, marks=marks, language=language))
+            res = await evaluate_answer(EvaluationRequest(question=question, answer=txt, marks=marks, language=language, user_id=user_id_for_usage, internal_call=True, eval_type="pdf"), http_request=request)
         elif mode == "combined":
             pattern = re.compile(r'(?:Question|Q):?\s*(.*?)\s*(?:Answer|A):?\s*(.*?)(?=(?:Question|Q):|$)', re.DOTALL | re.IGNORECASE)
             pairs = pattern.findall(txt)
@@ -479,7 +484,7 @@ async def evaluate_pdf(
             total = 0
             evs = []
             for q, a in pairs:
-                eval_res = await evaluate_answer(EvaluationRequest(question=q, answer=a, marks=marks, language=language))
+                eval_res = await evaluate_answer(EvaluationRequest(question=q, answer=a, marks=marks, language=language, user_id=user_id_for_usage, internal_call=True, eval_type="pdf"), http_request=request)
                 evs.append({"question": q, "result": eval_res})
                 total += eval_res.score
             res = {"evaluations": evs, "total_score": total, "total_max_score": len(evs)*marks, "count": len(evs), "extracted_text_preview": txt[:300]}
@@ -510,26 +515,6 @@ async def evaluate_pdf(
             except Exception as e:
                 # Only log, do not break evaluation
                 logger.error(f"[USAGE INCREMENT ERROR] {e}")
-
-        # Step 4: Save History
-        if user_id_for_usage:
-            try:
-                score = res.get("total_score") if isinstance(res, dict) and "total_score" in res else getattr(res, "score", None)
-                result_data = res if isinstance(res, dict) else res.model_dump()
-                
-                def save_history():
-                    return supabase_admin.table("history").insert({
-                        "user_id": user_id_for_usage,
-                        "input_text": txt,
-                        "result": result_data,
-                        "score": score
-                    }).execute()
-                
-                hist_res = await asyncio.to_thread(save_history)
-                print("[HISTORY SAVED]", hist_res.data)
-            except Exception as e:
-                print("[HISTORY ERROR]", e)
-                logger.error(f"[HISTORY ERROR] {e}")
 
         return res
         
@@ -589,14 +574,37 @@ async def ai_handler(request: dict):
         raise HTTPException(status_code=400, detail="Invalid mode. Choose 'evaluate' or 'improve'.")
 
 @app.post("/evaluate", response_model=EvaluationResponse, dependencies=[Depends(check_rate_limit)])
-async def evaluate_answer(request: EvaluationRequest):
+async def evaluate_answer(request: EvaluationRequest, http_request: Request):
     try:
+        print("[DEBUG] /evaluate HIT")
+
+        # --- AUTH EXTRACTION ---
+        user_id = None
+        auth_header = http_request.headers.get("Authorization")
+        print("[DEBUG] Auth Header:", auth_header)
+
+        if auth_header and auth_header.startswith("Bearer "):
+            try:
+                token = auth_header.split(" ")[1]
+                user_response = supabase_admin.auth.get_user(token)
+
+                if user_response and user_response.user:
+                    user_id = user_response.user.id
+                    print("[DEBUG] user_id:", user_id)
+            except Exception as e:
+                print("[AUTH ERROR]", e)
+        
+        # Safe internal fallback ONLY
+        if not user_id and request.internal_call and request.user_id:
+            user_id = request.user_id
+
         # Determine subject
-        subject = "theory"
-        if any(term in request.question.lower() for term in ["code", "program", "function", "java", "python", "script"]):
-            subject = "coding"
-        elif any(term in request.question.lower() for term in ["calculate", "solve", "math", "numerical", "find"]):
-            subject = "numerical"
+        subject = request.subject or "theory"
+        if subject == "theory": # Only auto-detect if not explicitly provided
+            if any(term in request.question.lower() for term in ["code", "program", "function", "java", "python", "script"]):
+                subject = "coding"
+            elif any(term in request.question.lower() for term in ["calculate", "solve", "math", "numerical", "find"]):
+                subject = "numerical"
             
         ai_result = await get_evaluation_ai(request.question, request.answer, request.marks, subject, request.language)
         
@@ -630,7 +638,7 @@ async def evaluate_answer(request: EvaluationRequest):
             result_label = "Needs Improvement"
             summary = "Your answer needs more detail."
 
-        return EvaluationResponse(
+        response_data = EvaluationResponse(
             score=final_score,
             max_score=request.marks,
             breakdown=breakdown,
@@ -639,17 +647,20 @@ async def evaluate_answer(request: EvaluationRequest):
             missing_points=ai_result.get("missing_points", [])[:3],
             ideal_answer=ai_result.get("model_answer", "No ideal answer provided."),
             detected_level=f"{request.marks}-mark level",
-            feedback="AI Evaluation Complete",
+            feedback=ai_result.get("feedback", "AI Evaluation Complete"),
             feedback_simple=ai_result.get("feedback", "No feedback provided."),
             mistake_explanations=[f"Focus on: {p}" for p in ai_result.get("missing_points", [])[:3]],
             summary=summary,
             result_label=result_label,
             improvement_plan="Review the missing points and the improved answer for reference.",
             learning_outcome="Keep practicing to refine your explanations!",
-            improved_answer=None, # Separate step now
+            improved_answer=None,
             validation_confidence=1.0,
-            extracted_text_preview=request.answer[:300]
+            extracted_text_preview=request.answer[:300] if len(request.answer) > 300 else request.answer
         )
+
+
+        return response_data
     except Exception as e:
         logger.error(f"Evaluation Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Something went wrong during AI evaluation: {str(e)}")
@@ -701,6 +712,8 @@ async def update_profile(req: ProfileUpdate, request: Request):
     except Exception as e:
         logger.error(f"Profile update error: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to update profile")
+
+
 
 # ==========================================
 # PART 6: RAZORPAY WEBHOOK & RECONCILIATION
@@ -948,3 +961,7 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 10000))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
+
+
+
