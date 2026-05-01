@@ -162,33 +162,17 @@ export default function EvaluatePage() {
         throw new Error("Backend URL not configured");
       }
       const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-      
-      const checkSession = async () => {
-        try {
-          const { data: { session }, error } = await supabase.auth.getSession();
-          if (error) throw error;
-          
-          if (!session) {
-            router.push('/login');
-            return null;
-          }
-          return session;
-        } catch (err: any) {
-          console.error("Evaluation session error:", err);
-          if (err.message?.includes("Refresh Token") || err.status === 400) {
-            await supabase.auth.signOut();
-            router.push('/login');
-            return null;
-          }
-          throw err;
-        }
-      };
 
-      const session = await checkSession();
-      if (!session) return;
-      
-      const token = session.access_token;
+      // Check session for advanced features or token passing
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
 
+      // GUARD: Only manual mode is public
+      if (inputMode !== 'manual' && !session) {
+        alert("Please login to use Answer Sheet or Combined PDF evaluation.");
+        return;
+      }
+      
       if (inputMode === 'manual') {
         const res = await fetch(`${apiUrl}/evaluate`, {
           method: "POST",
@@ -197,6 +181,7 @@ export default function EvaluatePage() {
         });
         await processResponse(res, isReevaluate, finalQuestion.trim(), userAnswer.trim());
       } else {
+        // PDF mode requires session (guarded above)
         const formData = new FormData();
         formData.append('file', selectedFile!);
         formData.append('marks', marks.toString());
