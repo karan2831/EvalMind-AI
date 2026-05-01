@@ -1,34 +1,27 @@
 import os
 import json
-from google import genai
 from typing import Dict, Any
 from dotenv import load_dotenv
+from openai import OpenAI
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Configure Gemini API Client
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+# Configure OpenAI Client
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
+    print("[WARNING] OPENAI_API_KEY missing — OpenAI disabled")
+openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
-if not GEMINI_API_KEY:
-    raise ValueError("❌ GEMINI_API_KEY is missing. Please set it in environment variables.")
+# Configure Groq Client (OpenAI-compatible interface)
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+if not GROQ_API_KEY:
+    print("[WARNING] GROQ_API_KEY missing — Groq disabled")
+groq_client = OpenAI(
+    api_key=GROQ_API_KEY,
+    base_url="https://api.groq.com/openai/v1"
+) if GROQ_API_KEY else None
 
-print("[GEMINI INIT] Using key:", GEMINI_API_KEY[:6] + "****")
-
-client = genai.Client(api_key=GEMINI_API_KEY)
-
-# Startup test to verify API key works
-try:
-    _test = client.models.generate_content(
-        model="gemini-1.0-pro",
-        contents=[{
-            "role": "user",
-            "parts": [{"text": "Hello"}]
-        }]
-    )
-    print("✅ Gemini API key working")
-except Exception as _e:
-    print("❌ Gemini API key invalid or no access:", _e)
 
 # Safe fallback — returned when AI fails or returns invalid data
 EVALUATION_FALLBACK = {
@@ -78,9 +71,18 @@ async def get_evaluation_ai(question: str, answer: str, marks: int = 5, subject:
     Always returns a valid result — never raises to the caller.
     """
     try:
+        # Reference context (reserved for future enrichment)
+        reference_context = ""
+        context_block = f"\nREFERENCE CONTEXT (use to verify, do NOT copy):\n{reference_context}\n" if reference_context else ""
+
         prompt = f"""
 You are a strict academic evaluator. Evaluate the student's answer using exam-level standards.
 
+LANGUAGE RULE:
+- The question or answer may be in English, Hindi, or Bengali.
+- You MUST always output your evaluation in ENGLISH only.
+- Compare the meaning and concepts — NOT word-for-word translation.
+{context_block}
 CONTEXT
 Marks:
 - 2 → short, direct answer expected
@@ -143,16 +145,14 @@ If unable, return {{}}.
 }}
 """
 
-        model_name = 'gemini-1.0-pro'
+        model_name = "llama3-70b-8192"
         print("[AI MODEL]", model_name)
-        response = client.models.generate_content(
+        response = groq_client.chat.completions.create(
             model=model_name,
-            contents=[{
-                "role": "user",
-                "parts": [{"text": prompt}]
-            }]
+            temperature=0.2,
+            messages=[{"role": "user", "content": prompt}]
         )
-        result = _parse_json_response(response.text)
+        result = _parse_json_response(response.choices[0].message.content)
 
         # Validate required fields; fall back if missing
         required = {"coverage_score", "depth_score", "clarity_score", "feedback", "missing_points"}
@@ -175,7 +175,12 @@ async def get_improvement_ai(question: str, answer: str) -> Dict[str, Any]:
     """
     try:
         prompt = f"""
-You are an expert teacher.
+You are an expert teacher helping students improve their exam answers.
+
+LANGUAGE RULE:
+- The question or answer may be in English, Hindi, or Bengali.
+- You MUST always write the improved answer in ENGLISH only.
+- Understand the intent of the student's answer regardless of language.
 
 Improve the student's answer to achieve full marks.
 
@@ -193,20 +198,18 @@ OUTPUT (JSON ONLY)
 Return strictly valid JSON only.
 
 {{
-  "improved_answer": "refined version of student response"
+  "improved_answer": "refined version of student response in English"
 }}
 """
 
-        model_name = 'gemini-1.0-pro'
+        model_name = "llama3-70b-8192"
         print("[AI MODEL]", model_name)
-        response = client.models.generate_content(
+        response = groq_client.chat.completions.create(
             model=model_name,
-            contents=[{
-                "role": "user",
-                "parts": [{"text": prompt}]
-            }]
+            temperature=0.2,
+            messages=[{"role": "user", "content": prompt}]
         )
-        result = _parse_json_response(response.text)
+        result = _parse_json_response(response.choices[0].message.content)
 
         if not result or "improved_answer" not in result:
             return {"improved_answer": "Unable to generate improvement at this time."}
