@@ -110,6 +110,7 @@ class EvaluationRequest(BaseModel):
     question: str = Field(..., min_length=5, max_length=5000)
     answer: str = Field(..., min_length=5, max_length=10000)
     marks: int = Field(..., description="Must be 2, 5, or 10")
+    language: str = "en"
 
     @validator("marks")
     def validate_marks(cls, v):
@@ -398,7 +399,8 @@ async def evaluate_pdf(
     file: UploadFile = File(...),
     marks: int = Form(...),
     mode: str = Form(...),
-    question: Optional[str] = Form(None)
+    question: Optional[str] = Form(None),
+    language: str = Form("en")
 ):
     # Security: File Type Check
     if not file.filename.lower().endswith('.pdf') or file.content_type != 'application/pdf':
@@ -469,7 +471,7 @@ async def evaluate_pdf(
         # Step 2: run evaluation
         if mode == "answer_sheet":
             if not question or len(question) < 5: raise HTTPException(status_code=400, detail="Question is too short.")
-            res = await evaluate_answer(EvaluationRequest(question=question, answer=txt, marks=marks))
+            res = await evaluate_answer(EvaluationRequest(question=question, answer=txt, marks=marks, language=language))
         elif mode == "combined":
             pattern = re.compile(r'(?:Question|Q):?\s*(.*?)\s*(?:Answer|A):?\s*(.*?)(?=(?:Question|Q):|$)', re.DOTALL | re.IGNORECASE)
             pairs = pattern.findall(txt)
@@ -477,7 +479,7 @@ async def evaluate_pdf(
             total = 0
             evs = []
             for q, a in pairs:
-                eval_res = await evaluate_answer(EvaluationRequest(question=q, answer=a, marks=marks))
+                eval_res = await evaluate_answer(EvaluationRequest(question=q, answer=a, marks=marks, language=language))
                 evs.append({"question": q, "result": eval_res})
                 total += eval_res.score
             res = {"evaluations": evs, "total_score": total, "total_max_score": len(evs)*marks, "count": len(evs), "extracted_text_preview": txt[:300]}
@@ -543,6 +545,8 @@ async def ai_handler(request: dict):
     marks = request.get("marks", 5)
     mode = request.get("mode", "evaluate") # "evaluate" or "improve"
 
+    language = request.get("language", "en")
+
     if mode == "evaluate":
         try:
             # Determine subject
@@ -552,7 +556,7 @@ async def ai_handler(request: dict):
             elif any(term in question.lower() for term in ["calculate", "solve", "math", "numerical", "find"]):
                 subject = "numerical"
                 
-            ai_result = await get_evaluation_ai(question, answer, marks, subject)
+            ai_result = await get_evaluation_ai(question, answer, marks, subject, language)
             
             # Post-process for consistency
             cov_raw = ai_result.get("coverage_score", 50)
@@ -575,7 +579,7 @@ async def ai_handler(request: dict):
 
     elif mode == "improve":
         try:
-            ai_result = await get_improvement_ai(question, answer)
+            ai_result = await get_improvement_ai(question, answer, language)
             return {"improved_answer": ai_result.get("improved_answer", "No improvement generated.")}
         except Exception as e:
             logger.error(f"Improvement Error: {str(e)}")
@@ -594,7 +598,7 @@ async def evaluate_answer(request: EvaluationRequest):
         elif any(term in request.question.lower() for term in ["calculate", "solve", "math", "numerical", "find"]):
             subject = "numerical"
             
-        ai_result = await get_evaluation_ai(request.question, request.answer, request.marks, subject)
+        ai_result = await get_evaluation_ai(request.question, request.answer, request.marks, subject, request.language)
         
         # Calculate scores
         cov_raw = ai_result.get("coverage_score", 50)

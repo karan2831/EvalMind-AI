@@ -53,6 +53,15 @@ export default function EvaluatePage() {
   // Access Control States
   const [usageCount, setUsageCount] = useState(0);
   const [userPlan, setUserPlan] = useState<'free' | 'premium'>('free');
+  const [language, setLanguage] = useState("en");
+
+  // Auto-detect browser language
+  useEffect(() => {
+    const browserLang = navigator.language;
+    if (browserLang.includes("hi")) setLanguage("hi");
+    else if (browserLang.includes("bn")) setLanguage("bn");
+    else setLanguage("en");
+  }, []);
 
   const isLoggedIn = !!user;
   const isPremium = userPlan === 'premium';
@@ -177,7 +186,7 @@ export default function EvaluatePage() {
         const res = await fetch(`${apiUrl}/evaluate`, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...(token && { "Authorization": `Bearer ${token}` }) },
-          body: JSON.stringify({ question: finalQuestion.trim(), answer: userAnswer.trim(), marks })
+          body: JSON.stringify({ question: finalQuestion.trim(), answer: userAnswer.trim(), marks, language })
         });
         await processResponse(res, isReevaluate, finalQuestion.trim(), userAnswer.trim());
       } else {
@@ -186,6 +195,7 @@ export default function EvaluatePage() {
         formData.append('file', selectedFile!);
         formData.append('marks', marks.toString());
         formData.append('mode', inputMode);
+        formData.append('language', language);
         if (inputMode === 'answer_sheet') formData.append('question', finalQuestion.trim());
 
         const res = await fetch(`${apiUrl}/evaluate-pdf`, { 
@@ -236,7 +246,8 @@ export default function EvaluatePage() {
         body: JSON.stringify({
           question: isCustom ? customQuestion : selectedQuestion,
           answer: userAnswer || result.extracted_text_preview || "",
-          mode: "improve"
+          mode: "improve",
+          language: language
         }),
       });
       const data = await response.json();
@@ -268,6 +279,19 @@ export default function EvaluatePage() {
             )}
           </div>
           <p className="text-gray-500 font-medium">Precision-engineered academic assessment engine</p>
+          
+          {/* Language Selector */}
+          <div className="flex justify-center mt-4">
+            <select 
+              value={language} 
+              onChange={(e) => setLanguage(e.target.value)}
+              className="bg-white border border-gray-200 rounded-xl px-4 py-2 text-xs font-bold uppercase tracking-wider text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer shadow-sm"
+            >
+              <option value="en">English</option>
+              <option value="hi">Hindi</option>
+              <option value="bn">Bengali</option>
+            </select>
+          </div>
         </section>
 
         <div className="flex justify-center">

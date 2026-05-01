@@ -71,7 +71,7 @@ def _parse_json_response(text: str) -> Dict[str, Any]:
         return {}
 
 
-async def get_evaluation_ai(question: str, answer: str, marks: int = 5, subject: str = "theory") -> Dict[str, Any]:
+async def get_evaluation_ai(question: str, answer: str, marks: int = 5, subject: str = "theory", language: str = "en") -> Dict[str, Any]:
     """
     Performs strict academic evaluation of a student's answer.
     Always returns a valid result — never raises to the caller.
@@ -81,12 +81,17 @@ async def get_evaluation_ai(question: str, answer: str, marks: int = 5, subject:
         reference_context = ""
         context_block = f"\nREFERENCE CONTEXT (use to verify, do NOT copy):\n{reference_context}\n" if reference_context else ""
 
+        # Language naming mapping
+        lang_map = {"en": "English", "hi": "Hindi", "bn": "Bengali"}
+        target_lang = lang_map.get(language, "English")
+
         prompt = f"""
 You are a strict academic evaluator. Evaluate the student's answer using exam-level standards.
 
 LANGUAGE RULE:
-- The question or answer may be in English, Hindi, or Bengali.
-- You MUST always output your evaluation in ENGLISH only.
+- Target Language: {target_lang}
+- AUTO-MATCH: If the student's question or answer is written in Hindi or Bengali, you SHOULD automatically respond in that same language to match the student's context, unless {target_lang} is explicitly different from English.
+- You MUST always output your evaluation (especially 'feedback' and 'missing_points') in the detected/selected language only.
 - Compare the meaning and concepts — NOT word-for-word translation.
 {context_block}
 CONTEXT
@@ -194,18 +199,23 @@ If unable, return {{}}.
         return dict(EVALUATION_FALLBACK)
 
 
-async def get_improvement_ai(question: str, answer: str) -> Dict[str, Any]:
+async def get_improvement_ai(question: str, answer: str, language: str = "en") -> Dict[str, Any]:
     """
-    Provides an improved version of the student's answer.
-    Always returns a valid result — never raises to the caller.
+    Suggests a high-quality, improved version of the student's answer.
     """
     try:
+        # Language naming mapping
+        lang_map = {"en": "English", "hi": "Hindi", "bn": "Bengali"}
+        target_lang = lang_map.get(language, "English")
+
         prompt = f"""
-You are an expert teacher helping students improve their exam answers.
+You are a expert tutor. You help students refine their answers.
 
 LANGUAGE RULE:
 - The question or answer may be in English, Hindi, or Bengali.
-- You MUST always write the improved answer in ENGLISH only.
+- You MUST always write the improved answer in {target_lang} only.
+- AUTO-MATCH: If the input is in Hindi or Bengali, match that language for the output.
+- Generate improved answer in the selected/detected language ({target_lang}).
 - Understand the intent of the student's answer regardless of language.
 
 Improve the student's answer to achieve full marks.
@@ -224,7 +234,7 @@ OUTPUT (JSON ONLY)
 Return strictly valid JSON only.
 
 {{
-  "improved_answer": "refined version of student response in English"
+  "improved_answer": "refined version of student response in the target language"
 }}
 """
 
