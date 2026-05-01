@@ -145,7 +145,7 @@ If unable, return {{}}.
 }}
 """
 
-        model_name = "llama3-70b-8192"
+        model_name = "llama-3.1-70b-versatile"
         print("[AI MODEL]", model_name)
         response = groq_client.chat.completions.create(
             model=model_name,
@@ -202,7 +202,7 @@ Return strictly valid JSON only.
 }}
 """
 
-        model_name = "llama3-70b-8192"
+        model_name = "llama-3.1-70b-versatile"
         print("[AI MODEL]", model_name)
         response = groq_client.chat.completions.create(
             model=model_name,
