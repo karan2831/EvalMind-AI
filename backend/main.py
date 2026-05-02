@@ -311,18 +311,16 @@ def generate_ideal_answer(question: str, marks: int):
                 "Operational benefits or output": "You should mention what we get at the end."
             }
         }
+    # Determine key points based on marks (needed for scoring)
     if marks <= 2:
-        ideal = f"{knowledge['definition']}"
         key_points = [knowledge['points'][0]]
     elif marks <= 5:
-        ideal = f"{knowledge['definition']} Specifically, it involves: {', '.join(knowledge['points'][:3])}."
         key_points = knowledge['points'][:3]
     else:
-        intro = f"Introduction: {knowledge['definition']}"
-        body = "Explanation: " + " ".join(knowledge['points'])
-        ideal = f"{intro}\n\n{body}\n\nIn conclusion, this is essential for functionality."
         key_points = knowledge['points']
-    return ideal, key_points, knowledge.get("explanations", {})
+        
+    # Feature Disabled: Skip text generation
+    return "", key_points, knowledge.get("explanations", {})
 
 def validate_input_quality(answer: str, question: str, marks: int, key_points: List[str]):
     answer_lower = answer.lower()
@@ -384,7 +382,7 @@ def calculate_metrics(student_answer: str, key_points: List[str], marks: int):
         else:
             missing.append(pt)
     cov = matches / len(key_points) if key_points else 0
-    target_words = {2: 20, 5: 60, 10: 150}
+    target_words = {2: 20, 5: 90, 10: 200}
     target = target_words.get(marks, 60)
     depth = min(1.0, word_count / target)
     cues = ["therefore", "however", "consequently", "specifically", "furthermore", "process", "for example"]
@@ -541,13 +539,48 @@ async def ai_handler(request: dict):
             elif any(term in question.lower() for term in ["calculate", "solve", "math", "numerical", "find"]):
                 subject = "numerical"
                 
-            ai_result = await get_evaluation_ai(question, answer, marks, subject, language)
+            # Step 0: Validation Guard
+            ideal_content, key_pts, _ = generate_ideal_answer(question, marks)
+            status, _, _ = validate_input_quality(answer, question, marks, key_pts)
+            
+            if status == "garbage":
+                ai_result = {
+                    "coverage_score": 0,
+                    "depth_score": 0,
+                    "clarity_score": 0,
+                    "feedback": "Answer is not relevant or meaningful. Please write a proper answer.",
+                    "missing_points": ["Provide relevant answer content"],
+                    "model_answer": ""
+                }
+            else:
+                ai_result = await get_evaluation_ai(question, answer, marks, subject, language)
+                ai_result["model_answer"] = ""
             
             # Post-process for consistency
             cov_raw = ai_result.get("coverage_score", 50)
             dep_raw = ai_result.get("depth_score", 50)
             cla_raw = ai_result.get("clarity_score", 50)
             final_score = round(((cov_raw * 0.5) + (dep_raw * 0.3) + (cla_raw * 0.2)) / 100 * marks)
+            
+            # Step 4: Depth Penalty Logic
+            word_count = len(answer.split())
+            depth_thresholds = {2: 20, 5: 60, 10: 120}
+            min_expected = depth_thresholds.get(marks, 60)
+            
+            if word_count < min_expected:
+                # Calculate penalty ratio (0.5 to 0.8 based on how short it is)
+                penalty_ratio = 0.5 + (0.3 * (word_count / min_expected))
+                final_score = round(final_score * penalty_ratio)
+                
+                # Apply Soft Cap (60% of marks)
+                soft_cap = round(marks * 0.6)
+                final_score = min(final_score, soft_cap)
+                
+                # Feedback Alignment
+                depth_msg = " Answer is correct but lacks sufficient depth for the selected marks."
+                current_feedback = ai_result.get("feedback", "")
+                if depth_msg.strip() not in current_feedback:
+                    ai_result["feedback"] = current_feedback.rstrip() + depth_msg
             
             return {
                 "score": final_score,
@@ -564,7 +597,7 @@ async def ai_handler(request: dict):
 
     elif mode == "improve":
         try:
-            ai_result = await get_improvement_ai(question, answer, language)
+            ai_result = await get_improvement_ai(question, answer, marks, language)
             return {"improved_answer": ai_result.get("improved_answer", "No improvement generated.")}
         except Exception as e:
             logger.error(f"Improvement Error: {str(e)}")
@@ -606,13 +639,48 @@ async def evaluate_answer(request: EvaluationRequest, http_request: Request):
             elif any(term in request.question.lower() for term in ["calculate", "solve", "math", "numerical", "find"]):
                 subject = "numerical"
             
-        ai_result = await get_evaluation_ai(request.question, request.answer, request.marks, subject, request.language)
+        # Step 0: Validation Guard
+        ideal_content, key_pts, _ = generate_ideal_answer(request.question, request.marks)
+        status, val_conf, val_msg = validate_input_quality(request.answer, request.question, request.marks, key_pts)
+        
+        if status == "garbage":
+            ai_result = {
+                "coverage_score": 0,
+                "depth_score": 0,
+                "clarity_score": 0,
+                "feedback": "Answer is not relevant or meaningful. Please write a proper answer.",
+                "missing_points": ["Provide relevant answer content"],
+                "ideal_answer": ""
+            }
+        else:
+            ai_result = await get_evaluation_ai(request.question, request.answer, request.marks, subject, request.language)
+            ai_result["ideal_answer"] = ""
         
         # Calculate scores
         cov_raw = ai_result.get("coverage_score", 50)
         dep_raw = ai_result.get("depth_score", 50)
         cla_raw = ai_result.get("clarity_score", 50)
         final_score = round(((cov_raw * 0.5) + (dep_raw * 0.3) + (cla_raw * 0.2)) / 100 * request.marks)
+        
+        # Step 4: Depth Penalty Logic
+        word_count = len(request.answer.split())
+        depth_thresholds = {2: 20, 5: 60, 10: 120}
+        min_expected = depth_thresholds.get(request.marks, 60)
+        
+        if word_count < min_expected:
+            # Calculate penalty ratio (0.5 to 0.8 based on how short it is)
+            penalty_ratio = 0.5 + (0.3 * (word_count / min_expected))
+            final_score = round(final_score * penalty_ratio)
+            
+            # Apply Soft Cap (60% of marks)
+            soft_cap = round(request.marks * 0.6)
+            final_score = min(final_score, soft_cap)
+            
+            # Feedback Alignment
+            depth_msg = " Answer is correct but lacks sufficient depth for the selected marks."
+            current_feedback = ai_result.get("feedback", "")
+            if depth_msg.strip() not in current_feedback:
+                ai_result["feedback"] = current_feedback.rstrip() + depth_msg
         
         # Map to UI model
         cov = cov_raw / 100
@@ -645,7 +713,7 @@ async def evaluate_answer(request: EvaluationRequest, http_request: Request):
             scoring_breakdown=scoring,
             confidence=round((cov + clarity) / 2, 2),
             missing_points=ai_result.get("missing_points", [])[:3],
-            ideal_answer=ai_result.get("model_answer", "No ideal answer provided."),
+            ideal_answer=ai_result.get("ideal_answer", "No ideal answer provided."),
             detected_level=f"{request.marks}-mark level",
             feedback=ai_result.get("feedback", "AI Evaluation Complete"),
             feedback_simple=ai_result.get("feedback", "No feedback provided."),

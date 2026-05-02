@@ -490,7 +490,7 @@ export default function EvaluatePage() {
 
             <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-md">
               <div className="flex bg-gray-50 border-b border-gray-100">
-                {['overview', 'personalized fix', 'model answer', 'missing'].map((tab) => (
+                {['overview', 'personalized fix', 'missing'].map((tab) => (
                   <button 
                     key={tab} 
                     onClick={() => { setActiveTab(tab); if (tab === 'personalized fix') fetchImprovement(); }} 
@@ -520,14 +520,6 @@ export default function EvaluatePage() {
                         {result.improved_answer || "No refinement generated yet."}
                       </div>
                     )}
-                  </div>
-                )}
-                {activeTab === 'model answer' && (
-                  <div className="space-y-6">
-                    <h5 className="text-sm font-bold text-gray-900 uppercase">Ideal Reference Answer</h5>
-                    <div className="p-8 bg-blue-50/20 rounded-xl text-base text-gray-700 leading-loose border border-blue-100 whitespace-pre-wrap">
-                      {result.ideal_answer || result.model_answer}
-                    </div>
                   </div>
                 )}
                 {activeTab === 'missing' && (

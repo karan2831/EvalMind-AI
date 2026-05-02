@@ -94,11 +94,11 @@ LANGUAGE RULE:
 - You MUST always output your evaluation (especially 'feedback' and 'missing_points') in the detected/selected language only.
 - Compare the meaning and concepts — NOT word-for-word translation.
 {context_block}
-CONTEXT
+CONTEXT (Weightage Standards)
 Marks:
-- 2 → short, direct answer expected
-- 5 → moderate explanation with key concepts
-- 10 → detailed, structured answer required
+- 2 → Word Range: 20–50. Basic Identification/Definition. Direct, single-point answer.
+- 5 → Word Range: 90–140. Conceptual Explanation. Definition + explanation + 2–3 key points.
+- 10 → Word Range: 200–350. Advanced Structured Explanation. Intro + Body (4–6 points) + Conclusion.
 
 Subject: {subject}
 - theory → concepts, explanation, structure
@@ -113,10 +113,11 @@ SCORING (0–100 integers only)
 
 coverage_score:
 - % of key points present (e.g., 3/6 ≈ 50)
+- CRITICAL: Coverage (key points) > Word count. Reward relevant content even if concise.
 
 depth_score:
 - explanation quality relative to marks
-- short answers MUST score low for 5/10 marks
+- short answers MUST score low for 5/10 marks if they lack the required depth/explanation
 
 clarity_score:
 - structure, readability, coherence
@@ -129,14 +130,16 @@ RULES
 - Only assign 0 for completely irrelevant, nonsense, or blank answers
 - Penalize missing concepts heavily but proportionally
 - Clarity must NOT compensate for low coverage or depth
-- Do NOT assume missing facts
 - Do NOT overestimate
 - Partial credit is fair: a 3/5-mark answer should score ~50–60, not 0
 
 OUTPUT CONSTRAINTS
 - missing_points ≤ 5
-- feedback must be short and specific
-- Do NOT include model_answer in output
+- feedback MUST scale based on marks:
+  * 2 Marks → Short (1–2 lines), focused only on correctness.
+  * 5 Marks → Moderate (2–4 lines), including brief explanation and missing concepts.
+  * 10 Marks → Detailed and structured. MUST include: Strengths, Weaknesses, and Improvement Suggestions in a multi-line format.
+- Set 'ideal_answer' in the output JSON to an empty string "".
 
 INPUT
 Q: {question}
@@ -152,7 +155,8 @@ If unable, return {{}}.
   "depth_score": number,
   "clarity_score": number,
   "feedback": "string",
-  "missing_points": ["point1", "point2"]
+  "missing_points": ["point1", "point2"],
+  "ideal_answer": "a perfect model answer following the word range and structure for {marks} marks"
 }}
 """
 
@@ -199,9 +203,9 @@ If unable, return {{}}.
         return dict(EVALUATION_FALLBACK)
 
 
-async def get_improvement_ai(question: str, answer: str, language: str = "en") -> Dict[str, Any]:
+async def get_improvement_ai(question: str, answer: str, marks: int = 5, language: str = "en") -> Dict[str, Any]:
     """
-    Suggests a high-quality, improved version of the student's answer.
+    Suggests a high-quality, improved version of the student's answer based on marks weightage.
     """
     try:
         # Language naming mapping
@@ -216,19 +220,27 @@ LANGUAGE RULE:
 - You MUST always write the improved answer in {target_lang} only.
 - AUTO-MATCH: If the input is in Hindi or Bengali, match that language for the output.
 - Generate improved answer in the selected/detected language ({target_lang}).
-- Understand the intent of the student's answer regardless of language.
 
-Improve the student's answer to achieve full marks.
+Improve the student's answer to achieve full marks based on the following standards:
+
+MARKS-BASED STANDARDS:
+- 2 Marks: 20–50 words. Short, direct, single-point answer. No unnecessary explanation.
+- 5 Marks: 90–140 words. Moderate explanation. 2–3 key points. Structure: intro + explanation.
+- 10 Marks: 200–350 words. Fully structured: Introduction, detailed explanation with 4–6 key points, and a conclusion.
+
+STRICT UX RULE:
+- The same question MUST produce DIFFERENT structures and depths based on marks ({marks}).
+- Ensure the tone is professional and exam-ready.
 
 Rules:
 - Keep it exam-ready
 - Keep it clear and structured
 - Fix mistakes but preserve intent
-- Do not add unnecessary fluff
-- Maximum 120 words
+- Coverage (key points) is more important than word count, but stay within the range.
 
 Q: {question}
 Answer: {answer}
+Marks: {marks}
 
 OUTPUT (JSON ONLY)
 Return strictly valid JSON only.
