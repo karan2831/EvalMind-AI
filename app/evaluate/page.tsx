@@ -50,6 +50,7 @@ export default function EvaluatePage() {
   const [hasImproved, setHasImproved] = useState(false);
 
   // Access Control States
+  const FREE_LIMIT = 10;
   const [usageCount, setUsageCount] = useState(0);
   const [userPlan, setUserPlan] = useState<'free' | 'premium'>('free');
   const [pdfType, setPdfType] = useState<'answer_sheet' | 'combined'>('answer_sheet');
@@ -65,7 +66,7 @@ export default function EvaluatePage() {
 
   const isLoggedIn = !!user;
   const isPremium = userPlan === 'premium';
-  const isLimitReached = usageCount >= 20;
+  const isLimitReached = usageCount >= FREE_LIMIT;
 
   const canUseAdvanced = isLoggedIn && (isPremium || !isLimitReached);
 
@@ -347,7 +348,7 @@ export default function EvaluatePage() {
                         null
                       ) : (
                         <span className="text-[10px] text-gray-500 font-bold tabular-nums">
-                          {usageCount}/20
+                          {usageCount}/{FREE_LIMIT}
                         </span>
                       )}
 
@@ -356,7 +357,7 @@ export default function EvaluatePage() {
                         <div className="w-10 h-[2px] bg-gray-200 rounded-full mt-0.5 overflow-hidden">
                           <div
                             className={`h-full transition-all duration-500 ${isLimitReached ? 'bg-red-500' : 'bg-blue-500'}`}
-                            style={{ width: `${Math.min((usageCount / 20) * 100, 100)}%` }}
+                            style={{ width: `${Math.min((usageCount / FREE_LIMIT) * 100, 100)}%` }}
                           />
                         </div>
                       )}

@@ -62,6 +62,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 rate_limit_store = {}
 RATE_LIMIT_MAX = 20
 RATE_LIMIT_WINDOW = 60 # Seconds
+FREE_LIMIT = 10
 
 async def check_rate_limit(request: Request):
     client_ip = request.client.host
@@ -459,7 +460,7 @@ async def evaluate_pdf(
                 tier = user_data.data.get("tier", "free")
 
                 # 🔒 HARD LIMIT ENFORCEMENT
-                if tier != "premium" and current_usage_count >= 20:
+                if tier != "premium" and current_usage_count >= FREE_LIMIT:
                     raise HTTPException(
                         status_code=403,
                         detail="Monthly limit reached"
