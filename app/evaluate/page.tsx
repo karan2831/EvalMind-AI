@@ -141,6 +141,27 @@ export default function EvaluatePage() {
       if (inputMode === 'manual') {
         if (!finalQuestion || finalQuestion.trim().length < 5) throw new Error("Question must be at least 5 characters.");
         if (!userAnswer || userAnswer.trim().length < 5) throw new Error("Answer must be at least 5 characters.");
+        
+        // --- REFINED GARBAGE INPUT VALIDATION ---
+        const text = userAnswer.trim();
+        const words = text.split(/\s+/);
+        const meaningfulWords = words.filter(w => /[a-zA-Z]{3,}/.test(w)).length;
+
+        if (meaningfulWords === 0) {
+          setError("Please enter a valid answer.");
+          setResult(null);
+          setEvaluations(null);
+          setSummary(null);
+          return;
+        }
+
+        if (meaningfulWords / words.length < 0.3) {
+          setError("Please enter a more meaningful answer.");
+          setResult(null);
+          setEvaluations(null);
+          setSummary(null);
+          return;
+        }
       } else if (!selectedFile) {
         throw new Error("Please upload a PDF file.");
       }
@@ -208,7 +229,12 @@ export default function EvaluatePage() {
       }
       setActiveTab('overview');
     } catch (err: any) {
+      console.error("Evaluation Error:", err);
       setError(err.message || "Evaluation failed.");
+      // Ensure results are cleared on failure (especially if backend returns 400)
+      setResult(null);
+      setEvaluations(null);
+      setSummary(null);
     } finally {
       setTimeout(() => {
         setLoading(false);

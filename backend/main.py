@@ -645,14 +645,7 @@ async def evaluate_answer(request: EvaluationRequest, http_request: Request):
         status, val_conf, val_msg = validate_input_quality(request.answer, request.question, request.marks, key_pts)
         
         if status == "garbage":
-            ai_result = {
-                "coverage_score": 0,
-                "depth_score": 0,
-                "clarity_score": 0,
-                "feedback": "Answer is not relevant or meaningful. Please write a proper answer.",
-                "missing_points": ["Provide relevant answer content"],
-                "ideal_answer": ""
-            }
+            raise HTTPException(status_code=400, detail="Please enter a valid answer.")
         else:
             ai_result = await get_evaluation_ai(request.question, request.answer, request.marks, subject, request.language)
             ai_result["ideal_answer"] = ""

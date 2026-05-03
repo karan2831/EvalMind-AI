@@ -1,6 +1,7 @@
 import os
 import json
-from typing import Dict, Any
+import re
+from typing import Dict, Any, List
 from dotenv import load_dotenv
 from openai import OpenAI
 
@@ -37,6 +38,44 @@ GROQ_MODELS = [
     "llama-3.1-8b-instant",
     "mixtral-8x7b-32768"
 ]
+
+def validate_language(text: str, language: str) -> bool:
+    """Checks if text matches the target language using script detection."""
+    if not text or len(text.strip()) < 5: return True
+    
+    if language == "en":
+        # Reject if contains Devanagari or Bengali scripts
+        if re.search(r'[\u0900-\u09FF]', text):
+            return False
+        return True
+    elif language == "hi":
+        # Must contain Devanagari script
+        return bool(re.search(r'[\u0900-\u097F]', text))
+    elif language == "bn":
+        # Must contain Bengali script
+        return bool(re.search(r'[\u0980-\u09FF]', text))
+    return True
+
+def is_result_language_valid(result: Dict[str, Any], language: str) -> bool:
+    """Validates language across all text fields in the result."""
+    check_fields = ["feedback", "improved_answer", "summary"]
+    text_blobs = []
+    for f in check_fields:
+        val = result.get(f)
+        if val and isinstance(val, str): text_blobs.append(val)
+    
+    missing = result.get("missing_points")
+    if missing and isinstance(missing, list):
+        text_blobs.extend([str(m) for m in missing])
+    
+    if not text_blobs: return True
+    return validate_language(" ".join(text_blobs), language)
+
+LANGUAGE_FALLBACK_MSGS = {
+    "en": "Unable to generate response in selected language.",
+    "hi": "चयनित भाषा में उत्तर उत्पन्न करने में असमर्थ।",
+    "bn": "নির্বাচিত ভাষায় উত্তর তৈরি করা সম্ভব হয়নি।"
+}
 
 def _clamp_scores(result: Dict[str, Any]) -> Dict[str, Any]:
     """Clamp all scores to valid 0–100 integer range.
@@ -81,18 +120,24 @@ async def get_evaluation_ai(question: str, answer: str, marks: int = 5, subject:
         reference_context = ""
         context_block = f"\nREFERENCE CONTEXT (use to verify, do NOT copy):\n{reference_context}\n" if reference_context else ""
 
-        # Language naming mapping
         lang_map = {"en": "English", "hi": "Hindi", "bn": "Bengali"}
         target_lang = lang_map.get(language, "English")
-
+        lang_inst = {
+            "en": "Respond ONLY in English. Do NOT use any Hindi or Bengali words.",
+            "hi": "केवल हिंदी में उत्तर दें। किसी भी अंग्रेज़ी या बंगाली शब्द का उपयोग न करें।",
+            "bn": "শুধুমাত্র বাংলায় উত্তর দিন। ইংরেজি বা হিন্দি ব্যবহার করবেন না।"
+        }
+        
         prompt = f"""
-You are a strict academic evaluator. Evaluate the student's answer using exam-level standards.
+{lang_inst.get(language, "Respond in English.")}
 
-LANGUAGE RULE:
-- Target Language: {target_lang}
-- AUTO-MATCH: If the student's question or answer is written in Hindi or Bengali, you SHOULD automatically respond in that same language to match the student's context, unless {target_lang} is explicitly different from English.
-- You MUST always output your evaluation (especially 'feedback' and 'missing_points') in the detected/selected language only.
-- Compare the meaning and concepts — NOT word-for-word translation.
+IMPORTANT:
+- Do NOT mix languages
+- Do NOT include translations
+- Output must be strictly in the selected language ({target_lang})
+- Every text field (feedback, missing_points, ideal_answer) MUST be in {target_lang}.
+
+You are a strict academic evaluator. Evaluate the student's answer using exam-level standards.
 {context_block}
 CONTEXT (Weightage Standards)
 Marks:
@@ -189,6 +234,28 @@ If unable, return {{}}.
 
         result = _parse_json_response(response.choices[0].message.content)
 
+        # Language Validation + Retry Logic
+        if result and not is_result_language_valid(result, language):
+            print(f"[LANGUAGE MISMATCH] Retrying with stronger instruction for {language}")
+            retry_prompt = prompt + "\n\nSTRICTLY follow the language rules. Previous response violated them. Output must be 100% in " + target_lang
+            retry_messages = [{"role": "user", "content": retry_prompt}]
+            
+            try:
+                retry_response = openai_client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=retry_messages,
+                    temperature=0.1
+                )
+                result = _parse_json_response(retry_response.choices[0].message.content)
+            except: pass
+
+            # If still invalid, enforce localized fallback
+            if result and not is_result_language_valid(result, language):
+                print("[LANGUAGE MISMATCH] Second failure, applying fallback message")
+                msg = LANGUAGE_FALLBACK_MSGS.get(language, "Language mismatch")
+                if "feedback" in result: result["feedback"] = msg
+                if "missing_points" in result: result["missing_points"] = [msg]
+
         # Validate required fields; fall back if missing
         required = {"coverage_score", "depth_score", "clarity_score", "feedback", "missing_points"}
         if not result or not required.issubset(result.keys()):
@@ -208,18 +275,24 @@ async def get_improvement_ai(question: str, answer: str, marks: int = 5, languag
     Suggests a high-quality, improved version of the student's answer based on marks weightage.
     """
     try:
-        # Language naming mapping
         lang_map = {"en": "English", "hi": "Hindi", "bn": "Bengali"}
         target_lang = lang_map.get(language, "English")
+        lang_inst = {
+            "en": "Respond ONLY in English. Do NOT use any Hindi or Bengali words.",
+            "hi": "केवल हिंदी में उत्तर दें। किसी भी अंग्रेज़ी या बंगाली शब्द का उपयोग न करें।",
+            "bn": "শুধুমাত্র বাংলায় উত্তর দিন। ইংরেজি বা হিন্দি ব্যবহার করবেন না।"
+        }
 
         prompt = f"""
-You are a expert tutor. You help students refine their answers.
+{lang_inst.get(language, "Respond in English.")}
 
-LANGUAGE RULE:
-- The question or answer may be in English, Hindi, or Bengali.
-- You MUST always write the improved answer in {target_lang} only.
-- AUTO-MATCH: If the input is in Hindi or Bengali, match that language for the output.
-- Generate improved answer in the selected/detected language ({target_lang}).
+IMPORTANT:
+- Do NOT mix languages
+- Do NOT include translations
+- Output must be strictly in the selected language ({target_lang})
+- The field 'improved_answer' MUST be entirely in {target_lang}.
+
+You are a expert tutor. You help students refine their answers.
 
 Improve the student's answer to achieve full marks based on the following standards:
 
@@ -278,6 +351,27 @@ Return strictly valid JSON only.
             )
 
         result = _parse_json_response(response.choices[0].message.content)
+
+        # Language Validation + Retry Logic
+        if result and not is_result_language_valid(result, language):
+            print(f"[IMPROVEMENT LANGUAGE MISMATCH] Retrying with stronger instruction for {language}")
+            retry_prompt = prompt + "\n\nSTRICTLY follow the language rules. Output must be 100% in " + target_lang
+            retry_messages = [{"role": "user", "content": retry_prompt}]
+            
+            try:
+                retry_response = openai_client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=retry_messages,
+                    temperature=0.1
+                )
+                result = _parse_json_response(retry_response.choices[0].message.content)
+            except: pass
+
+            # If still invalid, enforce localized fallback
+            if result and not is_result_language_valid(result, language):
+                print("[IMPROVEMENT LANGUAGE MISMATCH] Second failure, applying fallback message")
+                msg = LANGUAGE_FALLBACK_MSGS.get(language, "Language mismatch")
+                if "improved_answer" in result: result["improved_answer"] = msg
 
         if not result or "improved_answer" not in result:
             return {"improved_answer": "Unable to generate improvement at this time."}
