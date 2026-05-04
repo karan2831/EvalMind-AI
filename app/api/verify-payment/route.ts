@@ -12,7 +12,10 @@ export async function POST(request: Request) {
       {
         cookies: {
           getAll() {
-            return cookieStore.getAll();
+            return cookieStore.getAll().map((cookie) => ({
+              name: cookie.name ?? "",
+              value: cookie.value ?? "",
+            }));
           },
           setAll(cookiesToSet) {
             try {
