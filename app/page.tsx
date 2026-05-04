@@ -50,8 +50,8 @@ export default function LandingPage() {
       <NavBar />
       
       {/* Hero Section */}
-      <header className="pt-40 pb-20 px-6">
-        <div className="max-w-4xl mx-auto flex flex-col items-center text-center">
+      <header className="pt-32 sm:pt-40 pb-16 sm:pb-20 px-4 sm:px-6">
+        <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 flex flex-col items-center text-center">
           <div className="mb-6 flex flex-col items-center">
             <div className="p-4 rounded-2xl bg-white shadow-sm border border-gray-100 flex items-center justify-center">
               <div className="relative flex items-center justify-center w-[clamp(100px,10vw,140px)] aspect-square">
@@ -68,25 +68,25 @@ export default function LandingPage() {
             <span className="text-[10px] text-gray-400 uppercase tracking-[0.2em] mt-4 font-bold">EvalMind AI</span>
           </div>
           
-          <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-gray-900 leading-[1.1]">
+          <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold tracking-tight text-gray-900 leading-[1.1]">
             Engineering the Future of <br className="hidden md:block" />
             <span className="text-blue-600">Fair Evaluation</span>
           </h1>
-          <p className="mt-6 text-lg md:text-xl text-gray-500 max-w-2xl font-medium leading-relaxed">
+          <p className="mt-6 text-base sm:text-lg md:text-xl text-gray-500 max-w-2xl font-medium leading-relaxed">
             Improve your answers, not just your marks. <br className="hidden md:block" />
             Evaluate subjective answers instantly with AI-powered feedback and structured scoring.
           </p>
           
-          <div className="mt-10 flex flex-col sm:flex-row gap-4">
+          <div className="mt-10 flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
             <button 
               onClick={() => router.push('/evaluate')}
-              className="bg-blue-600 text-white rounded-xl px-8 py-4 font-bold hover:bg-blue-700 transition-all active:scale-[0.98] shadow-lg shadow-blue-600/20"
+              className="w-full sm:w-auto bg-blue-600 text-white rounded-xl px-8 py-4 font-bold hover:bg-blue-700 transition-all active:scale-[0.98] shadow-lg shadow-blue-600/20"
             >
               Try Evaluation
             </button>
             <button 
               onClick={() => router.push('/login')}
-              className="border border-gray-200 text-gray-700 rounded-xl px-8 py-4 font-bold hover:bg-gray-50 transition-all active:scale-[0.98]"
+              className="w-full sm:w-auto border border-gray-200 text-gray-700 rounded-xl px-8 py-4 font-bold hover:bg-gray-50 transition-all active:scale-[0.98]"
             >
               View Demo
             </button>
@@ -105,8 +105,8 @@ export default function LandingPage() {
       </header>
 
       {/* Product Preview */}
-      <section className="py-20 px-6 bg-gray-50/50 overflow-hidden">
-        <div className="max-w-6xl mx-auto">
+      <section className="py-16 sm:py-20 px-4 sm:px-6 bg-gray-50/50 overflow-hidden">
+        <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest bg-blue-50 px-3 py-1 rounded-full border border-blue-100">Live Dashboard</span>
             <h2 className="mt-4 text-3xl font-bold text-gray-900">Professional Grade Interface</h2>
@@ -123,8 +123,8 @@ export default function LandingPage() {
               <div className="ml-4 h-6 w-64 bg-white border border-gray-100 rounded-md"></div>
             </div>
             {/* Mock Dashboard Content */}
-            <div className="p-8 grid grid-cols-3 gap-8">
-              <div className="col-span-2 space-y-6">
+            <div className="p-4 sm:p-8 grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8">
+              <div className="lg:col-span-2 space-y-4 sm:space-y-6">
                 <div className="h-48 bg-gray-50 rounded-xl border border-gray-100 p-6 flex flex-col justify-center gap-4">
                   <div className="h-4 w-1/3 bg-gray-200 rounded"></div>
                   <div className="space-y-2">
@@ -169,14 +169,14 @@ export default function LandingPage() {
       </section>
 
       {/* Features Section */}
-      <section className="py-24 px-6">
-        <div className="max-w-6xl mx-auto">
+      <section className="py-20 sm:py-24 px-4 sm:px-6">
+        <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16 space-y-4">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 tracking-tight">Everything you need to master answers</h2>
             <p className="text-gray-500 max-w-xl mx-auto">Powerful tools designed for students who value precision and growth.</p>
           </div>
           
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
             {loading ? (
               <>
                 <CardSkeleton />
@@ -199,13 +199,13 @@ export default function LandingPage() {
       </section>
 
       {/* How it Works */}
-      <section className="py-24 px-6 bg-gray-50/50">
-        <div className="max-w-5xl mx-auto">
+      <section className="py-20 sm:py-24 px-4 sm:px-6 bg-gray-50/50">
+        <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold text-gray-900 tracking-tight">Three steps to perfection</h2>
           </div>
           
-          <div className="grid md:grid-cols-3 gap-12 relative">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-12 relative">
             {/* Connecting Line */}
             <div className="hidden md:block absolute top-12 left-24 right-24 h-px bg-gray-200 z-0"></div>
             
@@ -223,8 +223,8 @@ export default function LandingPage() {
       </section>
 
       {/* Final CTA */}
-      <section className="py-32 px-6">
-        <div className="max-w-4xl mx-auto bg-gray-900 rounded-[2.5rem] p-12 md:p-20 text-center space-y-8 relative overflow-hidden">
+      <section className="py-24 sm:py-32 px-4 sm:px-6">
+        <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 bg-gray-900 rounded-[2.5rem] p-8 sm:p-12 md:p-20 text-center space-y-8 relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
             <div className="absolute top-[-50%] left-[-20%] w-[100%] h-[100%] bg-blue-600 rounded-full blur-[120px]"></div>
           </div>

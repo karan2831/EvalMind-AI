@@ -52,7 +52,11 @@ async def health_check():
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"[ERROR] Global Exception on {request.url.path}: {str(exc)}")
-    return {"detail": "An unexpected internal server error occurred."}
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Something went wrong. Please try again."}
+    )
 
 
 # ==========================================
@@ -173,7 +177,7 @@ class SupportRequest(BaseModel):
     description: str
     user_email: str | None = None
 
-@app.post("/support/create")
+@app.post("/support/create", dependencies=[Depends(verify_token)])
 async def create_support(data: SupportRequest):
     try:
         logger.info(f"[SUPPORT] Incoming request: {data}")
@@ -522,7 +526,7 @@ async def evaluate_pdf(
         logger.error(f"Internal Error: {str(e)}")
         raise HTTPException(status_code=500, detail="Something went wrong. Please try again.")
 
-@app.post("/ai")
+@app.post("/ai", dependencies=[Depends(verify_token)])
 async def ai_handler(request: dict):
     question = request.get("question")
     answer = request.get("answer")
@@ -607,7 +611,7 @@ async def ai_handler(request: dict):
     else:
         raise HTTPException(status_code=400, detail="Invalid mode. Choose 'evaluate' or 'improve'.")
 
-@app.post("/evaluate", response_model=EvaluationResponse, dependencies=[Depends(check_rate_limit)])
+@app.post("/evaluate", response_model=EvaluationResponse, dependencies=[Depends(check_rate_limit), Depends(verify_token)])
 async def evaluate_answer(request: EvaluationRequest, http_request: Request):
     try:
         print("[DEBUG] /evaluate HIT")
@@ -730,7 +734,7 @@ async def evaluate_answer(request: EvaluationRequest, http_request: Request):
 # ==========================================
 # PART 5.5: PROFILE & SUPPORT
 # ==========================================
-@app.get("/profile/{user_id}", dependencies=[Depends(check_rate_limit)])
+@app.get("/profile/{user_id}", dependencies=[Depends(check_rate_limit), Depends(verify_token)])
 async def get_profile(user_id: str):
     if not supabase_admin:
         raise HTTPException(status_code=500, detail="Supabase not initialized")

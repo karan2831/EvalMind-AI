@@ -29,7 +29,7 @@ export default function ProfileForm({ selectedAvatar, onUpdate }: ProfileFormPro
           setFullName(data.full_name || '');
         }
       } catch (error) {
-        console.error('Error loading profile:', error);
+        // Profile load failed
       } finally {
         setFetching(false);
       }
@@ -57,7 +57,6 @@ export default function ProfileForm({ selectedAvatar, onUpdate }: ProfileFormPro
         avatar: selectedAvatar || "smile"
       };
 
-      console.log("Updating profile with payload:", payload);
 
       const response = await fetch(`${BASE_URL}/profile/update`, {
         method: "POST",
@@ -69,7 +68,6 @@ export default function ProfileForm({ selectedAvatar, onUpdate }: ProfileFormPro
       });
 
       const data = await response.json();
-      console.log("API response:", data);
 
       if (!response.ok) {
         throw new Error(data?.detail || "Profile update failed");
@@ -88,7 +86,7 @@ export default function ProfileForm({ selectedAvatar, onUpdate }: ProfileFormPro
         }
       });
     } catch (error: any) {
-      console.error('Update error:', error);
+      // Profile update failed
       setMessage({ type: 'error', text: error.message || 'Failed to update profile.' });
     } finally {
       setLoading(false);

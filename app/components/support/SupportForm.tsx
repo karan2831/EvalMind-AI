@@ -21,11 +21,6 @@ export default function SupportForm() {
       const userEmail = session.user.email;
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://evalmind-ai.onrender.com";
       
-      console.log("Sending support request:", {
-        subject,
-        description,
-        user_email: userEmail
-      });
 
       const response = await fetch(`${backendUrl}/support/create`, {
         method: 'POST',
@@ -41,11 +36,9 @@ export default function SupportForm() {
       });
 
       const data = await response.json();
-      console.log("Support API response:", data);
 
       if (!response.ok) {
-        console.error("Status:", response.status);
-        console.error("Response:", data);
+        // Support request failed
         throw new Error(data?.detail || "Request failed");
       }
 
@@ -56,7 +49,7 @@ export default function SupportForm() {
         text: 'Your request has been submitted! We will get back to you soon.' 
       });
     } catch (error: any) {
-      console.error('Support error:', error);
+      // Support error
       setMessage({ type: 'error', text: error.message || 'Failed to submit request. Please try again.' });
     } finally {
       setLoading(false);

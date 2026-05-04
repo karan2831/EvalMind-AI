@@ -89,7 +89,7 @@ export default function EvaluatePage() {
           
           if (profile) {
             setUserPlan(profile.plan || 'free');
-            console.log("USER PLAN:", profile.plan || 'free');
+            setUserPlan(profile.plan || 'free');
           }
         }
       } catch (err: any) {
@@ -229,7 +229,7 @@ export default function EvaluatePage() {
       }
       setActiveTab('overview');
     } catch (err: any) {
-      console.error("Evaluation Error:", err);
+      // silent fail or handle via setError below
       setError(err.message || "Evaluation failed.");
       // Ensure results are cleared on failure (especially if backend returns 400)
       setResult(null);
@@ -287,19 +287,19 @@ export default function EvaluatePage() {
       setResult((prev: any) => ({ ...prev, improved_answer: data.improved_answer }));
       setHasImproved(true);
     } catch (error) {
-      console.error("Improvement fetch failed:", error);
+      // Improvement failed silently
     } finally {
       setIsImproving(false);
     }
   };
 
   return (
-    <div className="font-body text-[#1d1d1f] antialiased min-h-screen">
+    <div className="font-body text-[#1d1d1f] antialiased min-h-screen bg-white">
       <NavBar />
-      <main className="max-w-4xl mx-auto px-6 pt-32 pb-24 space-y-12 z-10 relative">
+      <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-24 sm:pt-32 pb-16 sm:pb-24 space-y-8 sm:space-y-12 z-10 relative">
         <section className="text-center space-y-3">
-          <div className="flex items-center justify-center gap-3">
-            <h1 className="text-4xl font-semibold tracking-tight text-gray-900">Evaluation Dashboard</h1>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold tracking-tight text-gray-900">Evaluation Dashboard</h1>
             {isPremium && (
               <span className="bg-gradient-to-r from-yellow-400 to-amber-500 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-md shadow-yellow-400/40 animate-pulse shadow-[0_0_12px_rgba(250,204,21,0.6)]">
                 Premium
@@ -395,7 +395,7 @@ export default function EvaluatePage() {
           </div>
         </div>
 
-        <section className="bg-white border border-gray-100 shadow-sm rounded-2xl p-8 space-y-8">
+        <section className="bg-white border border-gray-100 shadow-sm rounded-2xl p-4 sm:p-8 space-y-6 sm:space-y-8">
           <div className="space-y-6">
             {(inputMode === 'manual' || (inputMode === 'pdf' && pdfType === 'answer_sheet')) && (
               <div className="space-y-2">
@@ -416,7 +416,7 @@ export default function EvaluatePage() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-end">
               {inputMode === 'pdf' && (
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">
@@ -488,8 +488,8 @@ export default function EvaluatePage() {
             )}
           </div>
 
-          <div className="flex justify-end">
-            <button onClick={() => handleEvaluate()} disabled={loading} className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 disabled:opacity-50">
+          <div className="flex justify-end w-full sm:w-auto">
+            <button onClick={() => handleEvaluate()} disabled={loading} className="w-full sm:w-auto bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 disabled:opacity-50 transition-all">
               {loading ? "Analyzing..." : "Evaluate Now"}
             </button>
           </div>
@@ -504,8 +504,8 @@ export default function EvaluatePage() {
         )}
 
         {result && !loading && (
-          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="bg-white border border-gray-100 rounded-2xl p-10 text-center shadow-lg">
+          <div className="space-y-6 sm:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="bg-white border border-gray-100 rounded-2xl p-6 sm:p-10 text-center shadow-lg">
               <div className="flex flex-col items-center gap-2">
                 <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Final Score</span>
                 <div className="flex items-baseline gap-1 text-5xl font-black text-blue-600">
@@ -527,7 +527,7 @@ export default function EvaluatePage() {
                   </button>
                 ))}
               </div>
-              <div className="p-10">
+              <div className="p-6 sm:p-10">
                 {activeTab === 'overview' && (
                   <div className="space-y-6">
                     <p className="text-lg font-medium text-gray-800 leading-relaxed italic">"{result.summary}"</p>
@@ -552,7 +552,7 @@ export default function EvaluatePage() {
                 {activeTab === 'missing' && (
                   <div className="space-y-6">
                     <h5 className="text-sm font-bold text-gray-900 uppercase">Critical Gaps</h5>
-                    <div className="grid gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {result.missing_points?.map((m: string, i: number) => (
                         <div key={i} className="p-4 bg-red-50 text-red-700 rounded-xl text-sm font-semibold border border-red-100 flex items-center gap-3">
                           <span className="material-symbols-outlined text-red-400">error</span> {m}

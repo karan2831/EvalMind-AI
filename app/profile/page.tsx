@@ -34,7 +34,7 @@ export default function ProfilePage() {
         return data;
       }
     } catch (err) {
-      console.error("Profile fetch error:", err);
+      // Silent fail
     } finally {
       setProfileLoading(false);
     }
@@ -138,22 +138,19 @@ export default function ProfilePage() {
       });
 
       // 🔍 Debug raw response
-      console.log("[DEBUG] RAW RESPONSE:", res);
 
       // Read raw text first
       const text = await res.text();
-      console.log("[DEBUG] RAW TEXT:", text);
 
       // Safe JSON parse
       let order;
       try {
         order = JSON.parse(text);
       } catch (e) {
-        console.error("[ERROR] JSON parse failed:", e);
+        // JSON parse failed
         throw new Error("Invalid JSON response from server");
       }
 
-      console.log("[DEBUG] PARSED ORDER:", order);
 
       // Handle API errors properly
       if (!res.ok) {
@@ -162,19 +159,12 @@ export default function ProfilePage() {
 
       // Strict validation
       if (!order || !order.id) {
-        console.error("[ERROR] Order creation failed:", order);
+        // Order creation failed
         throw new Error("Order creation failed - invalid response");
       }
 
-      console.log("[DEBUG] Opening Razorpay with order:", order.id);
       
-      console.log("[DEBUG] Razorpay Key:", process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID);
 
-      if (!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID?.startsWith("rzp_live_")) {
-        console.error("[ERROR] Razorpay running in TEST mode");
-      } else {
-        console.log("[SUCCESS] Razorpay running in LIVE mode");
-      }
 
       const options = {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
@@ -195,7 +185,6 @@ export default function ProfilePage() {
           const data = await verifyRes.json();
 
           if (data.success) {
-            console.log("[SUCCESS] Payment verified & UI updated (reactive)");
             alert("🎉 Payment successful! You are now a Pro user.");
             
             // 🔁 Refresh user data
@@ -214,7 +203,7 @@ export default function ProfilePage() {
                   window.location.reload();
                 }
               } catch (err) {
-                console.error("[FALLBACK ERROR]", err);
+                // Fallback failed
                 window.location.reload();
               }
             }, 2000);
@@ -231,7 +220,7 @@ export default function ProfilePage() {
       rzp.open();
 
     } catch (err) {
-      console.error(err);
+      // Payment failed
       alert('Payment failed');
     }
   };
@@ -262,9 +251,9 @@ export default function ProfilePage() {
   );
 
   return (
-    <div className="font-body text-[#1d1d1f] antialiased min-h-screen transition-opacity duration-300 opacity-100">
+    <div className="font-body text-[#1d1d1f] antialiased min-h-screen transition-opacity duration-300 opacity-100 bg-white">
       <NavBar />
-      <main className="max-w-3xl mx-auto px-6 pt-32 pb-24 space-y-12 z-10 relative">
+      <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-24 sm:pt-32 pb-16 sm:pb-24 space-y-8 sm:space-y-12 z-10 relative">
         {/* Profile Header */}
         <section className="flex flex-col items-center text-center space-y-4">
           <div className="relative">
@@ -364,16 +353,16 @@ export default function ProfilePage() {
         </section>
 
         {/* Tabs */}
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <button 
             onClick={() => setActiveTab('profile')}
-            className={`w-full text-left px-4 py-3 rounded-xl transition-all font-bold text-sm ${activeTab === 'profile' ? 'bg-blue-50 text-blue-600 border border-blue-200 shadow-sm' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+            className={`flex-1 text-center sm:text-left px-4 py-3 rounded-xl transition-all font-bold text-sm ${activeTab === 'profile' ? 'bg-blue-50 text-blue-600 border border-blue-200 shadow-sm' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
           >
             Personal Info
           </button>
           <button 
             onClick={() => setActiveTab('support')}
-            className={`w-full text-left px-4 py-3 rounded-xl transition-all font-bold text-sm ${activeTab === 'support' ? 'bg-blue-50 text-blue-600 border border-blue-200 shadow-sm' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+            className={`flex-1 text-center sm:text-left px-4 py-3 rounded-xl transition-all font-bold text-sm ${activeTab === 'support' ? 'bg-blue-50 text-blue-600 border border-blue-200 shadow-sm' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
           >
             Support
           </button>

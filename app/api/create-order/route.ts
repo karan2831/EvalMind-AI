@@ -8,20 +8,15 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  console.log("[CREATE_ORDER] POST HIT");
-  
-  const cookieStore = await cookies();
-  console.log("[DEBUG] Backend Razorpay Key:", process.env.RAZORPAY_KEY_ID);
 
   if (!process.env.RAZORPAY_KEY_ID?.startsWith("rzp_live_")) {
-    console.error("[CRITICAL] Not using LIVE Razorpay key. [ERROR] Razorpay running in TEST mode");
+    // Not using LIVE Razorpay key
     return NextResponse.json(
       { error: "Payment system not in LIVE mode" },
       { status: 500 }
     );
   }
   
-  console.log("[SUCCESS] Razorpay running in LIVE mode");
 
   try {
     const supabase = createServerClient(
@@ -45,16 +40,14 @@ export async function POST(request: Request) {
       }
     );
 
-    console.log('[DEBUG] [CREATE_ORDER] All Cookies:', cookieStore.getAll());
 
     const { data: { user }, error } = await supabase.auth.getUser();
 
     if (error || !user) {
-      console.error('[SECURITY_ALERT] [CREATE_ORDER] Unauthorized access attempt or session expired.', error);
+      // Unauthorized access attempt
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log('[DEBUG] [CREATE_ORDER] Authenticated User ID:', user.id);
 
     const body = await request.json();
     const { amount, currency = 'INR', receipt = 'receipt_' + Date.now() } = body;
@@ -71,7 +64,6 @@ export async function POST(request: Request) {
       key_secret: process.env.RAZORPAY_KEY_SECRET!,
     });
 
-    console.log(`[CREATE_ORDER] Initializing order for user: ${user.id}, amount: ${amount}`);
     
     // Step 1: Create Razorpay order safely
     let order;
@@ -83,14 +75,13 @@ export async function POST(request: Request) {
         receipt
       });
 
-      console.log("[DEBUG] Razorpay Order:", order);
 
       if (!order || !order.id) {
         throw new Error("Invalid Razorpay order");
       }
 
     } catch (err) {
-      console.error("[CRITICAL] Razorpay failed:", err);
+      // Razorpay failed
       return NextResponse.json(
         { error: "Razorpay order failed" },
         { status: 500 }
@@ -98,7 +89,7 @@ export async function POST(request: Request) {
     }
 
     if (!process.env.NEXT_PUBLIC_BACKEND_URL) {
-      console.error("[CRITICAL] BACKEND URL NOT SET");
+      // BACKEND URL NOT SET
       return NextResponse.json(
         { error: "Backend URL not configured" },
         { status: 500 }
@@ -124,21 +115,20 @@ export async function POST(request: Request) {
         }
       );
 
-      console.log("[DEBUG] Backend status:", backendRes.status);
 
       if (!backendRes.ok) {
         const text = await backendRes.text();
-        console.error("[ERROR] Backend failed:", text);
+        // Backend failed
       }
     } catch (err) {
-      console.error("[WARNING] Backend sync failed:", err);
+      // Backend sync failed
     }
 
     // Step 3: ALWAYS return order
-    console.log("[SUCCESS] Order sent to frontend:", order.id);
     return NextResponse.json(order);
   } catch (error: any) {
-    console.error('[ERROR] [CREATE_ORDER] Exception:', error);
+    // Create order exception
+    console.error('[ERROR] [CREATE_ORDER] Exception');
     return NextResponse.json(
       { error: error.message || 'Something went wrong while creating the order' },
       { status: 500 }

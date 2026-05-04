@@ -33,7 +33,7 @@ export default function RootLayout({
           `}
         </Script>
       </head>
-      <body className="antialiased">
+      <body className="antialiased w-full max-w-full overflow-x-hidden">
         <PaymentListener />
         {children}
       </body>

@@ -27,7 +27,7 @@ export default function NavBar() {
           setLoading(false);
         }
       } catch (err: any) {
-        console.error("Session load error:", err);
+        // Session load failed
         if (err.message?.includes("Refresh Token") || err.status === 400) {
           await supabase.auth.signOut();
           router.push("/login");
@@ -41,7 +41,6 @@ export default function NavBar() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
 
-      console.log("Auth event:", event);
       if (event === 'SIGNED_IN' && !user) {
         setShowWelcome(true);
         setTimeout(() => mounted && setShowWelcome(false), 4000);
@@ -51,7 +50,6 @@ export default function NavBar() {
     });
 
     const handlePaymentSuccess = async () => {
-      console.log("[EVENT] Payment success detected, refreshing UI");
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
         if (error) throw error;
@@ -59,7 +57,7 @@ export default function NavBar() {
           setUser(session?.user || null);
         }
       } catch (err) {
-        console.error("Payment refresh error:", err);
+        // Payment refresh failed
       }
     };
 
@@ -98,7 +96,7 @@ export default function NavBar() {
     <>
       {/* TopAppBar */}
       <header className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-sm">
-        <div className="flex items-center justify-between px-6 h-16 w-full max-w-7xl mx-auto">
+        <div className="flex flex-wrap items-center justify-between px-4 sm:px-6 h-auto min-h-[4rem] py-2 sm:py-0 w-full max-w-7xl mx-auto gap-4">
           {/* Left: Logo & Branding */}
           <Link href="/" className="flex items-center gap-2 md:gap-3 transition-all duration-200 active:scale-95 group">
             <div className="flex items-center justify-center p-1 md:p-1.5 bg-white border border-gray-100 rounded-lg shadow-sm transition-transform duration-300 group-hover:scale-105 shrink-0">

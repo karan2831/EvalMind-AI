@@ -86,8 +86,8 @@ function SignupForm() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center font-body text-[#1d1d1f] w-full py-12">
       {/* Top Navigation Bar */}
-      <header className="fixed top-0 w-full z-50 glass-nav border-b border-[#e5e5ea] shadow-sm">
-        <div className="flex items-center justify-between px-6 h-16 w-full max-w-7xl mx-auto">
+      <header className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-[#e5e5ea] shadow-sm">
+        <div className="flex flex-wrap items-center justify-between px-4 sm:px-6 h-auto min-h-[4rem] py-2 sm:py-0 w-full max-w-7xl mx-auto gap-4">
           <Link href="/" className="flex items-center gap-3 transition-opacity hover:opacity-80">
             <div className="w-8 h-8 rounded-lg overflow-hidden shadow-sm border border-[#e5e5ea] flex items-center justify-center bg-white">
               <Image 
@@ -107,7 +107,7 @@ function SignupForm() {
       </header>
 
       {/* Main Content Canvas */}
-      <main className="w-full max-w-md px-6 py-12 flex flex-col items-center text-center z-10 relative">
+      <main className="w-full max-w-md px-4 sm:px-6 py-12 flex flex-col items-center text-center z-10 relative">
         <div className="mb-10">
           <h1 className="text-3xl font-bold tracking-tight text-[#1d1d1f] mb-2">Create an account</h1>
           <p className="text-gray-600 font-body text-base">Join the future of academic evaluation.</p>
